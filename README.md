@@ -17,11 +17,12 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [x] Free text recognition (should improve with more training data)
 - [x] Bubble text extraction
 - [x] Bubble masking
-- [x] Translated text insertion
+- [x] Bubble text insertion
 - [ ] Bubble Text ocr
-- [ ] Bubble Text translation
+- [x] Bubble Text translation
 - [ ] Free text ocr
 - [ ] Free text translation
+- [ ] Improve text resize algorithm, some texts are too small/big
 
 ## Examples
 

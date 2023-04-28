@@ -25,8 +25,8 @@ def adjust_contrast_brightness(img, contrast: float = 1.0, brightness: int = 0):
     return cv2.addWeighted(img, contrast, img, 0, brightness)
 
 
-def debug_image(img):
-    cv2.imshow("debug", img)
+def debug_image(img, name="debug"):
+    cv2.imshow(name, img)
     cv2.waitKey(0)
 
 
@@ -71,7 +71,13 @@ def ensure_gray(img):
 def do_mask(a, b, mask, inv=False):
     mask = ensure_gray(mask)
     a_loc, b_loc = a.copy(), b.copy()
-    mask_inv = cv2.bitwise_not(mask) if not inv else mask
+    mask_inv = cv2.bitwise_not(mask)
+
+    if inv:
+        temp = mask
+        mask = mask_inv
+        mask_inv = temp
+
     a_loc = cv2.bitwise_and(a_loc, a_loc, mask=mask_inv)
     b_loc = cv2.bitwise_and(b_loc, b_loc, mask=mask)
     return cv2.add(a_loc, b_loc)
@@ -85,9 +91,7 @@ def clean_text(frame, frame_mask):
         np.full(cleaned.shape, 255, dtype=cleaned.dtype),
         frame_mask,
     )
-
-    text = do_mask(frame, np.full(text.shape, 255, dtype=text.dtype), frame_mask, True)
-
+    text = do_mask(text, np.full(text.shape, 255, dtype=text.dtype), frame_mask, True)
     return text, cleaned
 
 
@@ -303,10 +307,14 @@ def wrap_text(text, max_chars):
 
 def get_average_font_size(font, text="some text here"):
     x, y, w, h = font.getbbox(text)
-    return max(map(lambda a: font.getbbox(a)[2], list(text))), h
+    widths = list(map(lambda a: font.getbbox(a)[2], list(text)))
+    widths.sort(reverse=True)
+    return widths[1] if len(widths) > 1 else widths[0], h
 
 
-def get_best_font_size(text, wh, font_file, start_size=18, step=1):
+def get_best_font_size(
+    text, wh, font_file, space_between_lines=1, start_size=18, step=1
+):
     current_font_size = start_size
     current_font = None
 
@@ -325,21 +333,19 @@ def get_best_font_size(text, wh, font_file, start_size=18, step=1):
         if not was_successful:
             current_font_size -= step
             continue
-        height_needed = len(lines) * cur_f_height
+        height_needed = (len(lines) * cur_f_height) + (
+            (len(lines) - 1) * space_between_lines
+        )
         if height_needed < max_height:
             return current_font_size, chars_per_line, cur_f_height, iterations
         current_font_size -= step
 
 
 def draw_text_in_bubble(
-    bbox,
     frame,
     frame_mask,
     text="Lorem ipsum dolor sit amet,  elit.",
 ):
-    # text = " ".join(list(map(lambda a: en_hyphenator.hyphenate(a), text.split(" "))))
-    (x1, y1, x2, y2) = bbox
-
     rect, pt1, pt2 = get_text_area(frame_mask)
 
     max_height = rect[3]
@@ -347,10 +353,12 @@ def draw_text_in_bubble(
 
     # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
+    space_between_lines = 10
     font_size, chars_per_line, line_height, iters = get_best_font_size(
         text,
         (max_width, max_height),
         "fonts/BlambotClassicBB.ttf",
+        space_between_lines,
         90,
         1,
     )
@@ -373,8 +381,18 @@ def draw_text_in_bubble(
             (
                 draw_x + abs(((max_width - w) / 2)),
                 draw_y
-                + ((max_height - (len(wrapped) * line_height)) / 2)
-                + (line_no * line_height),
+                + (
+                    (
+                        max_height
+                        - (
+                            (len(wrapped) * line_height)
+                            + (len(wrapped) * space_between_lines)
+                        )
+                    )
+                    / 2
+                )
+                + (line_no * line_height)
+                + (space_between_lines * line_no),
             ),
             str(line),
             fill=(0, 0, 0, 255),

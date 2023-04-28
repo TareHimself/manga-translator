@@ -1,7 +1,11 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
-from utils import extract_bubble, draw_text_in_bubble
+from manga_ocr import MangaOcr
+import requests
+import traceback
+from requests.utils import requote_uri
+from utils import extract_bubble, draw_text_in_bubble, debug_image, cv2_to_pil
 
 
 class FullConversion:
@@ -9,11 +13,34 @@ class FullConversion:
         self,
         detect_model="models/detection.pt",
         seg_model="models/segmentation.pt",
+        translator_auth=None,
         debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
         self.detection_model = YOLO(detect_model)
+        self.ocr = MangaOcr()
+        self.translator_auth = translator_auth
         self.debug = debug
+
+    def translate_text(self, text):
+        if self.translator_auth is None or len(self.translator_auth) == 0:
+            return "Need DeepL Auth"
+
+        try:
+            data = [("target_lang", "EN-US"), ("source_lang", "JA")]
+            data.append(("text", text))
+            uri = f"https://api-free.deepl.com/v2/translate?{'&'.join([f'{data[i][0]}={data[i][1]}' for i in range(len(data))])}"
+            uri = requote_uri(uri)
+            return requests.post(
+                uri,
+                headers={
+                    "Authorization": f"DeepL-Auth-Key {self.translator_auth}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            ).json()["translations"][0]["text"]
+        except Exception as e:
+            traceback.print_exc()
+            return "Failed To Get Translation"
 
     def filter_results(self, results, min_confidence=0.65):
         bounding_boxes = np.array(results.boxes.xyxy.cpu(), dtype="int")
@@ -65,8 +92,12 @@ class FullConversion:
                     bubble = frame[y1:y2, x1:x2]
                     text_mask = mask[y1:y2, x1:x2]
                     cleaned, text, bubble_mask = extract_bubble(bubble, text_mask)
+                    text_to_translate = self.ocr(cv2_to_pil(text))
+                    translated = self.translate_text(text_to_translate)
                     frame[y1:y2, x1:x2] = cleaned
-                    frame[y1:y2, x1:x2] = draw_text_in_bubble(box, bubble, bubble_mask)
+                    frame[y1:y2, x1:x2] = draw_text_in_bubble(
+                       bubble, bubble_mask, translated
+                    )
 
                 if self.debug:
                     cv2.putText(
@@ -81,35 +112,3 @@ class FullConversion:
 
             processed.append(frame)
         return processed
-
-
-# from manga_ocr import MangaOcr
-# import requests
-# from utils import extract_bubble
-# from requests.utils import requote_uri
-
-
-# manga_ocr = MangaOcr()
-
-
-# def translate(texts):
-#     data = [("target_lang", "EN-US"), ("source_lang", "JA")]
-#     for text in texts:
-#         data.append(("text", text))
-#     uri = f"https://api-free.deepl.com/v2/translate?{'&'.join([f'{data[i][0]}={data[i][1]}' for i in range(len(data))])}"
-#     print(uri)
-#     uri = requote_uri(uri)
-#     print(uri)
-#     return requests.post(
-#         uri,
-#         headers={
-#             "Authorization": f"DeepL-Auth-Key {KEY GOES HERE}",
-#             "Content-Type": "application/x-www-form-urlencoded",
-#         },
-#     ).json()["translations"]
-
-
-# def get_ocr(frame):
-#     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-#     return manga_ocr(Image.fromarray(frame))
