@@ -1,0 +1,5 @@
+train: 'seg/train/images'
+val: 'seg/val/images'
+
+nc: 2
+names: ['text_free', 'text_bubble']
