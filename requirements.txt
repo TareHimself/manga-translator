@@ -1,10 +1,8 @@
-easyocr==1.6.2
 largestinteriorrectangle==0.2.0
 manga_ocr==0.1.8
 mss==9.0.1
 numpy==1.23.5
 opencv_python==4.7.0.72
-Pillow==9.5.0
 Pillow==9.5.0
 PyHyphen==4.0.3
 Requests==2.29.0

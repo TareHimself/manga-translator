@@ -1,18 +1,16 @@
 import numpy as np
-import easyocr
 import cv2
 import json
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
 import largestinteriorrectangle as lir
-import textwrap
+import os
 import math
-import hyphen
+from hyphen import Hyphenator
+from hyphen.textwrap2 import wrap
+import shutil
+from tqdm import tqdm
 
-en_hyphenator = hyphen.Hyphenator("en_US")
-
-en_hyphenator.wrap
+en_hyphenator = Hyphenator("en_US")
 
 
 def adjust_contrast_brightness(img, contrast: float = 1.0, brightness: int = 0):
@@ -286,23 +284,34 @@ def pt_to_pixels(pt):
     return pt * (16 / 12)
 
 
-def wrap_text(text, max_chars):
-    result = []
-    text = text.split(" ")
-    if len(max(text, key=len)) > max_chars:
-        return False, []
+# def wrap_text(text, max_chars):
+#     result = []
+#     text = text.split(" ")
+#     hyphenated = []
+#     for t in text:
+#         if len(t) > max_chars:
+#             result = en_hyphenator.wrap(t, max_chars)
+#             if len(result) == 0:
+#                 return False, []
+#             hyphenated.extend(result)
+#         else:
+#             hyphenated.append(t)
 
-    current_line = ""
-    for word in text:
-        if len(current_line + word) > max_chars:
-            result.append(current_line)
-            current_line = word
-        else:
-            current_line += " " + word
-            current_line = current_line.strip()
-    if len(current_line):
-        result.append(current_line)
-    return True, result
+#     current_line = ""
+#     for word in hyphenated:
+#         if len(current_line + word) > max_chars:
+#             result.append(current_line)
+#             current_line = word
+#         else:
+#             current_line += " " + word
+#             current_line = current_line.strip()
+#     if len(current_line):
+#         result.append(current_line)
+#     return True, result
+
+
+def wrap_text(text, max_chars):
+    return wrap(text, max_chars, use_hyphenator=en_hyphenator)
 
 
 def get_average_font_size(font, text="some text here"):
@@ -313,11 +322,16 @@ def get_average_font_size(font, text="some text here"):
 
 
 def get_best_font_size(
-    text, wh, font_file, space_between_lines=1, start_size=18, step=1
+    text,
+    wh,
+    font_file,
+    space_between_lines=1,
+    start_size=18,
+    step=1,
+    min_chars_per_line=6,
 ):
     current_font_size = start_size
     current_font = None
-
     max_width, max_height = wh
 
     iterations = 0
@@ -328,11 +342,12 @@ def get_best_font_size(
             return None, None, None, iterations
         cur_f_width, cur_f_height = get_average_font_size(current_font, text)
         chars_per_line = math.floor(max_width / cur_f_width)
-        was_successful, lines = wrap_text(text, chars_per_line)
-
-        if not was_successful:
+        if chars_per_line < min_chars_per_line:
             current_font_size -= step
             continue
+
+        lines = wrap_text(text, chars_per_line)
+
         height_needed = (len(lines) * cur_f_height) + (
             (len(lines) - 1) * space_between_lines
         )
@@ -344,7 +359,7 @@ def get_best_font_size(
 def draw_text_in_bubble(
     frame,
     frame_mask,
-    text="Lorem ipsum dolor sit amet,  elit.",
+    text="Sample",
 ):
     rect, pt1, pt2 = get_text_area(frame_mask)
 
@@ -359,7 +374,7 @@ def draw_text_in_bubble(
         (max_width, max_height),
         "fonts/BlambotClassicBB.ttf",
         space_between_lines,
-        90,
+        30,
         1,
     )
 
@@ -373,7 +388,7 @@ def draw_text_in_bubble(
     draw_x = pt1[0]
     draw_y = pt1[1]
 
-    successful, wrapped = wrap_text(text, chars_per_line)
+    wrapped = wrap_text(text, chars_per_line)
     for line_no in range(len(wrapped)):
         line = wrapped[line_no]
         x, y, w, h = font.getbbox(line)
@@ -407,16 +422,176 @@ class COCO_TO_YOLO_TASK:
     DETECTION = "detect"
 
 
-def coco_to_yolo(json_dir, images_dir, task=COCO_TO_YOLO_TASK.DETECTION):
+def pad(num: int, ammount=3):
+    final = f"{num}"
+    if len(final) >= ammount:
+        return final
+
+    for i in range(ammount - len(final)):
+        final = "0" + final
+
+    return final
+
+
+def index_images_in_dir(index: dict, path: str):
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        if os.path.isdir(item_path):
+            index_images_in_dir(index, item_path)
+        else:
+            index[item] = item_path
+    return
+
+
+def min_index(arr1, arr2):
+    """Find a pair of indexes with the shortest distance.
+    Args:
+        arr1: (N, 2).
+        arr2: (M, 2).
+    Return:
+        a pair of indexes(tuple).
+    """
+    dis = ((arr1[:, None, :] - arr2[None, :, :]) ** 2).sum(-1)
+    return np.unravel_index(np.argmin(dis, axis=None), dis.shape)
+
+
+def merge_multi_segment(segments):
+    """Merge multi segments to one list.
+    Find the coordinates with min distance between each segment,
+    then connect these coordinates with one thin line to merge all
+    segments into one.
+
+    Args:
+        segments(List(List)): original segmentations in coco's json file.
+            like [segmentation1, segmentation2,...],
+            each segmentation is a list of coordinates.
+    """
+    s = []
+    segments = [np.array(i).reshape(-1, 2) for i in segments]
+    idx_list = [[] for _ in range(len(segments))]
+
+    # record the indexes with min distance between each segment
+    for i in range(1, len(segments)):
+        idx1, idx2 = min_index(segments[i - 1], segments[i])
+        idx_list[i - 1].append(idx1)
+        idx_list[i].append(idx2)
+
+    # use two round to connect all the segments
+    for k in range(2):
+        # forward connection
+        if k == 0:
+            for i, idx in enumerate(idx_list):
+                # middle segments have two indexes
+                # reverse the index of middle segments
+                if len(idx) == 2 and idx[0] > idx[1]:
+                    idx = idx[::-1]
+                    segments[i] = segments[i][::-1, :]
+
+                segments[i] = np.roll(segments[i], -idx[0], axis=0)
+                segments[i] = np.concatenate([segments[i], segments[i][:1]])
+                # deal with the first segment and the last one
+                if i in [0, len(idx_list) - 1]:
+                    s.append(segments[i])
+                else:
+                    idx = [0, idx[1] - idx[0]]
+                    s.append(segments[i][idx[0] : idx[1] + 1])
+
+        else:
+            for i in range(len(idx_list) - 1, -1, -1):
+                if i not in [0, len(idx_list) - 1]:
+                    idx = idx_list[i]
+                    nidx = abs(idx[1] - idx[0])
+                    s.append(segments[i][nidx:])
+    return s
+
+
+def coco_to_yolo(
+    json_dir, images_dir, out_dir="new_dataset", task=COCO_TO_YOLO_TASK.SEGMENTATION
+):
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+
+    out_images_dir = os.path.join(out_dir, "images")
+    out_labels_dir = os.path.join(out_dir, "labels")
+    os.mkdir(out_dir)
+    os.mkdir(out_images_dir)
+    os.mkdir(out_labels_dir)
+
     with open(json_dir, "r") as f:
         json_file = json.load(f)
         images = json_file["images"]
         annotations = json_file["annotations"]
-        categories = json_file["categories"]
-        images_index = {}
-        for img in images:
-            images_index[img["id"]] = img
+        coco_images_indexed = {}
+        for img in tqdm(images, desc="Indexing images"):
+            coco_images_indexed[img["id"]] = img
 
-        categories_index = {}
-        for cat in categories:
-            categories_index[cat["id"]] = cat
+        local_images_indexed = {}
+
+        print("Searching for local images")
+        index_images_in_dir(local_images_indexed, images_dir)
+        print(f"Found {len(local_images_indexed.keys())} local images")
+
+        labels = {}
+        for annotation in tqdm(annotations, desc="Converting annotations"):
+            computed = []
+
+            image = coco_images_indexed[annotation["image_id"]]
+            w, h = image["width"], image["height"]
+            annotation_class = str(annotation["category_id"] - 1)
+            image_file_name = image["file_name"]
+
+            fn, _ = image_file_name.split(".")
+            combined_name = f"{fn}.txt|{image_file_name}"
+
+            if combined_name not in labels.keys():
+                labels[combined_name] = []
+
+            if task == COCO_TO_YOLO_TASK.SEGMENTATION:
+                if len(annotation["segmentation"]) > 1:
+                    s = merge_multi_segment(annotation["segmentation"])
+                    s = (
+                        (np.concatenate(s, axis=0) / np.array([w, h]))
+                        .reshape(-1)
+                        .tolist()
+                    )
+                else:
+                    s = [
+                        j for i in annotation["segmentation"] for j in i
+                    ]  # all segments concatenated
+                    s = (
+                        (np.array(s).reshape(-1, 2) / np.array([w, h]))
+                        .reshape(-1)
+                        .tolist()
+                    )
+                s = " ".join(
+                    [annotation_class] + list(map(lambda a: str(round(a, 6)), s))
+                )
+                if s not in computed:
+                    computed.append(s)
+            elif task == COCO_TO_YOLO_TASK.DETECTION:
+                # The COCO box format is [top left x, top left y, width, height]
+                box = np.array(annotation["bbox"], dtype=np.float64)
+                box[:2] += box[2:] / 2  # xy top-left corner to center
+                box[[0, 2]] /= w  # normalize x
+                box[[1, 3]] /= h  # normalize y
+                if box[2] <= 0 or box[3] <= 0:  # if w <= 0 and h <= 0
+                    continue
+
+                box = " ".join(
+                    [annotation_class]
+                    + list(map(lambda a: str(round(a, 6)), box.tolist()))
+                )
+                if box not in computed:
+                    computed.append(box)
+
+            labels[combined_name].extend(computed)
+
+        for combined_name, computed in tqdm(labels.items(), desc="Saving Dataset"):
+            out_name, image_name = combined_name.split("|")
+            with open(os.path.join(out_labels_dir, out_name), "wt") as f:
+                f.write("\n".join(computed))
+
+            shutil.copy(
+                local_images_indexed[image_name],
+                os.path.join(out_images_dir, image_name),
+            )

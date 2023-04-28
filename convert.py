@@ -7,7 +7,7 @@ from pipelines import FullConversion
 if len(sys.argv) < 2:
     raise Exception("No file's specified")
 
-converter = FullConversion(translator_auth="")
+converter = FullConversion()
 
 filenames = sys.argv[1 : len(sys.argv)]
 filenames = sys.argv[1 : len(sys.argv)]
