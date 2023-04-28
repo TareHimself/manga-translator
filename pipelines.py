@@ -92,12 +92,19 @@ class FullConversion:
                     bubble = frame[y1:y2, x1:x2]
                     text_mask = mask[y1:y2, x1:x2]
                     cleaned, text, bubble_mask = extract_bubble(bubble, text_mask)
-                    text_to_translate = self.ocr(cv2_to_pil(text))
-                    translated = self.translate_text(text_to_translate)
                     frame[y1:y2, x1:x2] = cleaned
-                    frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                       bubble, bubble_mask, translated
-                    )
+
+                    if (
+                        self.translator_auth is not None
+                        and len(self.translator_auth) > 0
+                    ):
+                        text_to_translate = self.ocr(cv2_to_pil(text))
+                        translated = self.translate_text(text_to_translate)
+                        frame[y1:y2, x1:x2] = draw_text_in_bubble(
+                            bubble, bubble_mask, translated
+                        )
+                    else:
+                        frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, bubble_mask)
 
                 if self.debug:
                     cv2.putText(

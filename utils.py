@@ -336,7 +336,7 @@ def get_best_font_size(
         height_needed = (len(lines) * cur_f_height) + (
             (len(lines) - 1) * space_between_lines
         )
-        if height_needed < max_height:
+        if height_needed <= max_height:
             return current_font_size, chars_per_line, cur_f_height, iterations
         current_font_size -= step
 
@@ -351,9 +351,9 @@ def draw_text_in_bubble(
     max_height = rect[3]
     max_width = rect[2]
 
-    # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
+    cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
-    space_between_lines = 10
+    space_between_lines = 0
     font_size, chars_per_line, line_height, iters = get_best_font_size(
         text,
         (max_width, max_height),
