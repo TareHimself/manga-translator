@@ -34,11 +34,11 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 
 ### Original
 
-<img src="ja_oshi_no_ko_1_4.png" width="500"/><img src="ja_oshi_no_ko_1_28.png" width="500"/>
+<img src="ja_oshi_no_ko_1_004.png" width="500"/><img src="ja_oshi_no_ko_1_028.png" width="500"/>
 
 ### Converted
 
-<img src="ja_oshi_no_ko_1_4_converted.png" width="500"/><img src="ja_oshi_no_ko_1_28_converted.png" width="500"/>
+<img src="ja_oshi_no_ko_1_004_converted.png" width="500"/><img src="ja_oshi_no_ko_1_028_converted.png" width="500"/>
 
 ## Glossary
 
