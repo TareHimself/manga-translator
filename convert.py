@@ -16,5 +16,5 @@ converted = converter([cv2.imread(file) for file in filenames])
 for filename, frame in zip(filenames, converted):
     ext = filename.split(".")[1]
     cv2.imwrite(
-        filename[0 : len(filename) - (len(ext) + 2)] + "_converted." + ext, frame
+        filename[0 : len(filename) - (len(ext) + 1)] + "_converted." + ext, frame
     )
