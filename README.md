@@ -7,7 +7,6 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - PIL for text replacement
 - Have not decided on ocr tech or translation method
 ## Progress
-The aim is to translate manga pages by using yolo to detect speech bubbles, translate said bubbles and replace the japanese text with the translations
 - [x] Bubble recognition (should improve with more training data)
 - [x] Free text recognition (should improve with more training data)
 - [x] Bubble text extraction 
