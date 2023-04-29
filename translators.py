@@ -30,6 +30,7 @@ class DeepLTranslator(Translator):
             return "Need DeepL Auth"
 
         text = self.ocr(cv2_to_pil(text))
+        print(text)
         try:
             data = [("target_lang", "EN-US"), ("source_lang", "JA")]
             data.append(("text", text))
@@ -45,3 +46,11 @@ class DeepLTranslator(Translator):
         except Exception as e:
             traceback.print_exc()
             return "Failed To Get Translation"
+
+
+class GoogleTranslateTranslator(Translator):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def translate(self, text: np.ndarray):
+        return super().translate(text)

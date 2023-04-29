@@ -595,3 +595,70 @@ def coco_to_yolo(
                 local_images_indexed[image_name],
                 os.path.join(out_images_dir, image_name),
             )
+
+
+def roboflow_coco_to_yolo(dataset_dir):
+    annotations_path = os.path.join(dataset_dir, "_annotations.coco.json")
+    if not os.path.exists(annotations_path):
+        for item in os.listdir(dataset_dir):
+            if os.path.isdir(os.path.join(dataset_dir, item)):
+                roboflow_coco_to_yolo(os.path.join(dataset_dir, item))
+        return
+
+    images_dir = os.path.join(dataset_dir, "images")
+    labels_dir = os.path.join(dataset_dir, "labels")
+    image_files = []
+
+    for file in os.listdir(dataset_dir):
+        if file.endswith(".jpg"):
+            image_files.append((os.path.join(dataset_dir, file), file))
+
+    os.mkdir(images_dir)
+    os.mkdir(labels_dir)
+
+    for image_file, image_name in tqdm(image_files, desc="Moving Images"):
+        shutil.move(
+            image_file,
+            os.path.join(images_dir, image_name),
+        )
+
+    image_files = []
+
+    with open(annotations_path, "r") as f:
+        json_file = json.load(f)
+        image_files = json_file["images"]
+        annotations = json_file["annotations"]
+        coco_images_indexed = {}
+        for img in tqdm(image_files, desc="Indexing images"):
+            coco_images_indexed[img["id"]] = img
+
+        labels = {}
+        for annotation in tqdm(annotations, desc="Converting annotations"):
+            computed = []
+
+            image = coco_images_indexed[annotation["image_id"]]
+            w, h = image["width"], image["height"]
+            annotation_class = str(annotation["category_id"] - 1)
+            image_file_name = image["file_name"]
+            final_filename = image_file_name.replace(".jpg", ".txt")
+            if final_filename not in labels.keys():
+                labels[final_filename] = []
+            if len(annotation["segmentation"]) > 1:
+                s = merge_multi_segment(annotation["segmentation"])
+                s = (np.concatenate(s, axis=0) / np.array([w, h])).reshape(-1).tolist()
+            else:
+                s = [
+                    j for i in annotation["segmentation"] for j in i
+                ]  # all segments concatenated
+                s = (np.array(s).reshape(-1, 2) / np.array([w, h])).reshape(-1).tolist()
+            s = " ".join([annotation_class] + list(map(lambda a: str(round(a, 6)), s)))
+            if s not in computed:
+                computed.append(s)
+
+            labels[final_filename].extend(computed)
+
+        for filename, computed in tqdm(labels.items(), desc="Saving Labels"):
+            with open(os.path.join(labels_dir, filename), "wt") as f:
+                f.write("\n".join(computed))
+
+    os.remove(annotations_path)

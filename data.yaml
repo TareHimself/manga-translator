@@ -1,5 +1,0 @@
-train: 'custom/train/images'
-val: 'custom/val/images'
-
-nc: 2
-names: ['text_free', 'text_bubble']

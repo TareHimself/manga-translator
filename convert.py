@@ -2,12 +2,12 @@ import os
 import sys
 import cv2
 from pipelines import FullConversion
-
+from translators import DeepLTranslator
 
 if len(sys.argv) < 2:
     raise Exception("No file's specified")
 
-converter = FullConversion()
+converter = FullConversion(translator=DeepLTranslator(auth_token=""))
 
 filenames = sys.argv[1 : len(sys.argv)]
 filenames = sys.argv[1 : len(sys.argv)]
