@@ -37,7 +37,7 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 </a>
 
 ### Segmentation
-<a href="https://universe.roboflow.com/tarehimself/manga-translator-detection">
+<a href="https://universe.roboflow.com/tarehimself/manga-translator-segmentation">
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
 
