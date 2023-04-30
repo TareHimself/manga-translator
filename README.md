@@ -31,25 +31,26 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [ ] Improve text resize algorithm, some texts are too small/big
 
 ## Datasets
+
 ### Detection
+
 <a href="https://universe.roboflow.com/tarehimself/manga-translator-detection">
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
 
 ### Segmentation
+
 <a href="https://universe.roboflow.com/tarehimself/manga-translator-segmentation">
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
 
 ## Examples
 
-### Original
+<img src="ja_a_certain_scientific_accelerator_1_001.png" width="500"/><img src="ja_a_certain_scientific_accelerator_1_001_converted.png" width="500"/>
 
-<img src="ja_oshi_no_ko_1_004.png" width="500"/><img src="ja_oshi_no_ko_1_028.png" width="500"/>
+<img src="ja_one_punch_man_194.jpg" width="500"/><img src="ja_one_punch_man_194_converted.jpg" width="500"/>
 
-### Converted
-
-<img src="ja_oshi_no_ko_1_004_converted.png" width="500"/><img src="ja_oshi_no_ko_1_028_converted.png" width="500"/>
+<img src="ja_oshi_no_ko_1_004.png" width="500"/><img src="ja_oshi_no_ko_1_004_converted.png" width="500"/>
 
 ## Glossary
 

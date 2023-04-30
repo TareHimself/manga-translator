@@ -254,8 +254,8 @@ def draw_text_in_bubble(
     max_width = pt2[0] - pt1[0]
 
     # fill background incase of segmentation errors
-    # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
-    cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
+    cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
+    # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
     space_between_lines = 0
     font_size, chars_per_line, line_height, iters = get_best_font_size(
@@ -271,37 +271,37 @@ def draw_text_in_bubble(
     if not font_size:
         return frame
     frame_to_pil = cv2_to_pil(frame)
-    # draw = ImageDraw.Draw(frame_to_pil)
+    draw = ImageDraw.Draw(frame_to_pil)
 
-    # font = ImageFont.truetype("fonts/BlambotClassicBB.ttf", font_size)
-    # draw_x = pt1[0]
-    # draw_y = pt1[1]
+    font = ImageFont.truetype("fonts/BlambotClassicBB.ttf", font_size)
+    draw_x = pt1[0]
+    draw_y = pt1[1]
 
-    # wrapped = wrap_text(text, chars_per_line)
-    # for line_no in range(len(wrapped)):
-    #     line = wrapped[line_no]
-    #     x, y, w, h = font.getbbox(line)
-    #     draw.text(
-    #         (
-    #             draw_x + abs(((max_width - w) / 2)),
-    #             draw_y
-    #             + (
-    #                 (
-    #                     max_height
-    #                     - (
-    #                         (len(wrapped) * line_height)
-    #                         + (len(wrapped) * space_between_lines)
-    #                     )
-    #                 )
-    #                 / 2
-    #             )
-    #             + (line_no * line_height)
-    #             + (space_between_lines * line_no),
-    #         ),
-    #         str(line),
-    #         fill=(0, 0, 0, 255),
-    #         font=font,
-    #     )
+    wrapped = wrap_text(text, chars_per_line)
+    for line_no in range(len(wrapped)):
+        line = wrapped[line_no]
+        x, y, w, h = font.getbbox(line)
+        draw.text(
+            (
+                draw_x + abs(((max_width - w) / 2)),
+                draw_y
+                + (
+                    (
+                        max_height
+                        - (
+                            (len(wrapped) * line_height)
+                            + (len(wrapped) * space_between_lines)
+                        )
+                    )
+                    / 2
+                )
+                + (line_no * line_height)
+                + (space_between_lines * line_no),
+            ),
+            str(line),
+            fill=(0, 0, 0, 255),
+            font=font,
+        )
 
     return pil_to_cv2(frame_to_pil)
 
@@ -499,7 +499,7 @@ def roboflow_coco_to_yolo(dataset_dir):
     image_files = []
 
     for file in os.listdir(dataset_dir):
-        if file.endswith(".jpg"):
+        if file.endswith(".jpg") or file.endswith(".png"):
             image_files.append((os.path.join(dataset_dir, file), file))
 
     os.mkdir(images_dir)
