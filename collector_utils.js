@@ -5,7 +5,7 @@ function pad(num, ammount = 3) {
 		return final;
 	}
 
-	const needed = ammount - num.length;
+	const needed = ammount - final.length;
 
 	for (let i = 0; i < needed; i++) {
 		final = '0' + final;
@@ -14,7 +14,7 @@ function pad(num, ammount = 3) {
 	return final;
 }
 
-async function download_chapter(manga, chapter) {
+async function download_chapters_canvas(manga, chapter) {
 	const download = async (el, filename, delay = 1000) => {
 		el.scrollIntoView();
 		await new Promise((res) => setTimeout(res, delay));
@@ -31,4 +31,26 @@ async function download_chapter(manga, chapter) {
 		await download(items[i], `${mana}_${chapter}_${pad(i)}`);
 	}
 }
-download_chapter('ja_one_punch_man', '1');
+
+async function toDataURL(url) {
+	const blob = await fetch(url).then((res) => res.blob());
+	return URL.createObjectURL(blob);
+}
+
+async function download_chapters_images(manga, chapter) {
+	const download = async (el, filename, delay = 1000) => {
+		el.scrollIntoView();
+		await new Promise((res) => setTimeout(res, delay));
+		const link = document.createElement('a');
+		link.download = `${filename}.png`;
+		link.href = await toDataURL(el.src);
+		link.click();
+		link.remove();
+		console.log('Downloading ', filename);
+	};
+
+	const items = document.querySelectorAll('.image-vertical');
+	for (let i = 0; i < items.length; i++) {
+		await download(items[i], `${manga}_${chapter}_${pad(i)}`);
+	}
+}

@@ -1,5 +1,5 @@
-train: 'detect/train/images'
-val: 'detect/valid/images'
+train: 'detection/train/images'
+val: 'detection/valid/images'
 
 nc: 2
 names: ['text_bubble', 'text_free']

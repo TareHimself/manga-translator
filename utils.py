@@ -28,38 +28,6 @@ def debug_image(img, name="debug"):
     cv2.waitKey(0)
 
 
-# def clean_text(frame):
-#     total_tl = [9e12, 9e12]
-#     total_br = [0, 0]
-
-#     results = ocr.readtext(frame)
-
-#     if len(results) == 0:
-#         return frame, frame
-
-#     cleaned = frame.copy()
-
-#     for result in results:
-#         tl, _, br, __ = result[0]
-
-#         x1, y1 = int(tl[0]), int(tl[1])
-#         x2, y2 = int(br[0]), int(br[1])
-
-#         total_tl[0] = x1 if x1 < total_tl[0] else total_tl[0]
-#         total_tl[1] = y1 if y1 < total_tl[1] else total_tl[1]
-#         total_br[0] = x2 if x2 > total_br[0] else total_br[0]
-#         total_br[1] = y2 if y2 > total_br[1] else total_br[1]
-
-#         cv2.rectangle(cleaned, (x1, y1), (x2, y2), (255, 255, 255), -1)
-
-#     x1, y1 = int(total_tl[0]), int(total_tl[1])
-#     x2, y2 = int(total_br[0]), int(total_br[1])
-#     text = frame.copy()
-#     text = text[y1:y2, x1:x2]
-
-#     return text, cleaned
-
-
 def ensure_gray(img):
     if len(img.shape) > 2:
         return cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
@@ -93,68 +61,8 @@ def clean_text(frame, frame_mask):
     return text, cleaned
 
 
-def make_bubble_mask(frame):
-    item = frame.copy()
-    # Convert to grayscale and apply adaptive thresholding
-    gray_frame = cv2.cvtColor(item, cv2.COLOR_RGB2GRAY)
-
-    # gray_frame = cv2.GaussianBlur(gray_frame, (19, 19), 0)
-
-    # cv2.imshow("blurred", adjust_contrast_brightness(gray_frame, 20))
-    # cv2.waitKey(0)
-
-    ret, thresh = cv2.threshold(gray_frame, 200, 255, cv2.THRESH_BINARY)
-
-    contours, hierarchy = cv2.findContours(
-        image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE
-    )
-
-    # # see the results
-    # cv2.imshow("All Contours", image_copy)
-    # cv2.waitKey(0)
-    # Create an empty mask for the bubble
-    mask = np.zeros_like(gray_frame)
-
-    # Fill in the mask with the largest contour (assuming it's the bubble)
-
-    # cv2.imshow(
-    #     "all contours",
-    #     cv2.drawContours(
-    #         image=mask.copy(),
-    #         contours=contours,
-    #         contourIdx=-1,
-    #         color=(255, 255, 255),
-    #         thickness=2,
-    #         lineType=cv2.LINE_AA,
-    #     ),
-    # )
-
-    # cv2.waitKey(0)
-
-    image_area = len(mask) * len(mask[0])
-    best = None
-    latest = 0
-    for cnt in contours:
-        coverage = (
-            cv2.fillPoly(mask.copy(), pts=[cnt], color=(255, 255, 255)) == 255
-        ).sum() / image_area
-        if coverage > latest:
-            best = cnt
-            latest = coverage
-
-    cv2.fillPoly(mask, pts=[best], color=(255, 255, 255))
-    # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
-
-    # draw contours on the original image
-
-    # masked_bubble = cv2.bitwise_and(bubble, bubble, mask=mask)
-
-    return mask
-
-
 # make_bubble_mask v2
-def mask_frame(frame):
+def make_bubble_mask(frame):
     image = frame.copy()
     # Apply a Gaussian blur to reduce noise
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
@@ -200,50 +108,11 @@ def mask_frame(frame):
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     return adjust_contrast_brightness(mask, 100)
 
-    # # Find contours in the image
-    # contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
-    # # Create a black image with the same size as the original
-
-    # stage_1 = cv2.drawContours(
-    #     np.zeros_like(image), contours, -1, (255, 255, 255), thickness=1
-    # )
-
-    # # ret, thresh = cv2.threshold(stage_1, 200, 255, cv2.THRESH_BINARY)
-
-    # stage_1 = cv2.cvtColor(stage_1, cv2.COLOR_BGR2GRAY)
-
-    # cv2.imshow(
-    #     "state 1 contour",
-    #     stage_1,
-    # )
-    # cv2.waitKey(0)
-
-    # # Find the largest contour, assuming it's the circle
-    # max_contour = max(contours, key=cv2.contourArea)
-
-    # # Draw the largest contour (circle) filled with white color
-
-    # # Find contours in the image
-    # contours, _ = cv2.findContours(stage_1, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
-    # mask = np.zeros_like(image)
-
-    # for cont in contours:
-    #     cv2.imshow(
-    #         "PARTS", cv2.fillPoly(mask.copy(), pts=[cont], color=(255, 255, 255))
-    #     )
-    #     cv2.waitKey(0)
-
-    # cv2.drawContours(mask, contours, -1, (255, 255, 255), thickness=cv2.FILLED)
-
-    return mask
-
 
 def extract_bubble(frame, frame_mask):
     text, cleaned = clean_text(frame, frame_mask)
 
-    mask = mask_frame(cleaned)
+    mask = make_bubble_mask(cleaned)
 
     bubble_color = np.full(cleaned.shape, 255, dtype=cleaned.dtype)
 
@@ -258,7 +127,7 @@ def pil_to_cv2(img) -> np.ndarray:
     return np.array(img)[:, :, ::-1]
 
 
-def get_text_area(frame_mask):
+def get_bounds_for_text(frame_mask):
     gray = ensure_gray(frame_mask)
     # Threshold the image
     ret, thresh = cv2.threshold(gray, 200, 255, 0)
@@ -273,7 +142,51 @@ def get_text_area(frame_mask):
 
     rect = lir.lir(polygon)
 
-    return rect, lir.pt1(rect), lir.pt2(rect)
+    return lir.pt1(rect), lir.pt2(rect)
+
+
+def fix_order_after_intersection_fix(
+    a1, a2, b1, b2, was_sorted, was_intersecting=False
+):
+    if was_sorted:
+        return b1, b2, a1, a2, was_intersecting
+
+    return a1, a2, b1, b2, was_intersecting
+
+
+def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
+    if not sorted:
+        if a1[0] < b1[0]:
+            return fix_intersection(a1, a2, b1, b2, True)
+        else:
+            return fix_intersection(b1, b2, a1, a2, True, True)
+
+    # a is above b
+    if a1[1] < b1[1]:
+        is_intersecting = a1[0] < b1[0] < a2[0] and a1[1] < b1[1] < a2[1]
+        if not is_intersecting:
+            return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted)
+
+        midpoint_x = max(abs(int(((a2[0] - b1[0]) / 2))) + 1, 3)
+
+        midpoint_y = abs(int(((a2[1] - b1[1]) / 2))) + 1
+
+        b1[0] += midpoint_x
+        a2[0] -= midpoint_x
+        return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
+    else:
+        is_intersecting = a1[0] < b1[0] < a2[0] and b1[1] < a1[1] < b2[1]
+        if not is_intersecting:
+            return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted)
+
+        midpoint_x = max(abs(int(((a2[0] - b1[0]) / 2))) + 1, 3)
+
+        midpoint_y = abs(int(((b2[1] - a1[0]) / 2))) + 1
+
+        b1[0] += midpoint_x
+        a2[0] -= midpoint_x
+
+        return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
 
 
 def pixels_to_pt(pixels):
@@ -282,32 +195,6 @@ def pixels_to_pt(pixels):
 
 def pt_to_pixels(pt):
     return pt * (16 / 12)
-
-
-# def wrap_text(text, max_chars):
-#     result = []
-#     text = text.split(" ")
-#     hyphenated = []
-#     for t in text:
-#         if len(t) > max_chars:
-#             result = en_hyphenator.wrap(t, max_chars)
-#             if len(result) == 0:
-#                 return False, []
-#             hyphenated.extend(result)
-#         else:
-#             hyphenated.append(t)
-
-#     current_line = ""
-#     for word in hyphenated:
-#         if len(current_line + word) > max_chars:
-#             result.append(current_line)
-#             current_line = word
-#         else:
-#             current_line += " " + word
-#             current_line = current_line.strip()
-#     if len(current_line):
-#         result.append(current_line)
-#     return True, result
 
 
 def wrap_text(text, max_chars):
@@ -358,14 +245,16 @@ def get_best_font_size(
 
 def draw_text_in_bubble(
     frame,
-    frame_mask,
+    bounds,
     text="Sample",
 ):
-    rect, pt1, pt2 = get_text_area(frame_mask)
+    pt1, pt2 = bounds
 
-    max_height = rect[3]
-    max_width = rect[2]
+    max_height = pt2[1] - pt1[1]
+    max_width = pt2[0] - pt1[0]
 
+    # fill background incase of segmentation errors
+    # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
     cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
     space_between_lines = 0
@@ -382,37 +271,37 @@ def draw_text_in_bubble(
     if not font_size:
         return frame
     frame_to_pil = cv2_to_pil(frame)
-    draw = ImageDraw.Draw(frame_to_pil)
+    # draw = ImageDraw.Draw(frame_to_pil)
 
-    font = ImageFont.truetype("fonts/BlambotClassicBB.ttf", font_size)
-    draw_x = pt1[0]
-    draw_y = pt1[1]
+    # font = ImageFont.truetype("fonts/BlambotClassicBB.ttf", font_size)
+    # draw_x = pt1[0]
+    # draw_y = pt1[1]
 
-    wrapped = wrap_text(text, chars_per_line)
-    for line_no in range(len(wrapped)):
-        line = wrapped[line_no]
-        x, y, w, h = font.getbbox(line)
-        draw.text(
-            (
-                draw_x + abs(((max_width - w) / 2)),
-                draw_y
-                + (
-                    (
-                        max_height
-                        - (
-                            (len(wrapped) * line_height)
-                            + (len(wrapped) * space_between_lines)
-                        )
-                    )
-                    / 2
-                )
-                + (line_no * line_height)
-                + (space_between_lines * line_no),
-            ),
-            str(line),
-            fill=(0, 0, 0, 255),
-            font=font,
-        )
+    # wrapped = wrap_text(text, chars_per_line)
+    # for line_no in range(len(wrapped)):
+    #     line = wrapped[line_no]
+    #     x, y, w, h = font.getbbox(line)
+    #     draw.text(
+    #         (
+    #             draw_x + abs(((max_width - w) / 2)),
+    #             draw_y
+    #             + (
+    #                 (
+    #                     max_height
+    #                     - (
+    #                         (len(wrapped) * line_height)
+    #                         + (len(wrapped) * space_between_lines)
+    #                     )
+    #                 )
+    #                 / 2
+    #             )
+    #             + (line_no * line_height)
+    #             + (space_between_lines * line_no),
+    #         ),
+    #         str(line),
+    #         fill=(0, 0, 0, 255),
+    #         font=font,
+    #     )
 
     return pil_to_cv2(frame_to_pil)
 

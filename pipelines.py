@@ -7,7 +7,13 @@ import sys
 import requests
 import traceback
 from requests.utils import requote_uri
-from utils import extract_bubble, draw_text_in_bubble, debug_image, cv2_to_pil
+from utils import (
+    extract_bubble,
+    draw_text_in_bubble,
+    debug_image,
+    get_bounds_for_text,
+    fix_intersection,
+)
 from translators import Translator
 
 
@@ -24,7 +30,7 @@ class FullConversion:
         self.translator = translator
         self.debug = debug
 
-    def filter_results(self, results, min_confidence=0.65):
+    def filter_results(self, results, min_confidence=0.2):
         bounding_boxes = np.array(results.boxes.xyxy.cpu(), dtype="int")
 
         classes = np.array(results.boxes.cls.cpu(), dtype="int")
@@ -62,16 +68,19 @@ class FullConversion:
 
             filtered = self.filter_results(result)
 
-            for box, cls, conf in filtered:
+            to_translate = []
+            # First pass, mask all bubbles
+            for bbox, cls, conf in filtered:
                 # if conf < 0.65:
                 #     continue
 
                 # print(get_ocr(get_box_section(frame, box)))
                 color = (0, 0, 255) if cls == 1 else (0, 255, 0)
 
-                (x1, y1, x2, y2) = box
+                (x1, y1, x2, y2) = bbox
 
-                if cls == 1:
+                class_name = result.names[cls]
+                if class_name == "text_bubble":
                     bubble = frame[y1:y2, x1:x2]
                     text_mask = mask[y1:y2, x1:x2]
                     cleaned, text_as_image, bubble_mask = extract_bubble(
@@ -79,13 +88,8 @@ class FullConversion:
                     )
                     frame[y1:y2, x1:x2] = cleaned
 
-                    if self.translator:
-                        translation = self.translator(text_as_image)
-                        frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                            bubble, bubble_mask, translation
-                        )
-                    else:
-                        frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, bubble_mask)
+                    text_bounds = get_bounds_for_text(bubble_mask)
+                    to_translate.append([bbox, bubble, text_as_image, text_bounds])
 
                 if self.debug:
                     cv2.putText(
@@ -97,6 +101,104 @@ class FullConversion:
                         color,
                         2,
                     )
+
+            # second pass, fix intersecting text areas
+            for i in range(len(to_translate)):
+                bbox_a = to_translate[i][0]
+                text_bounds_a_local = to_translate[i][3]
+                text_bounds_a = [
+                    [
+                        text_bounds_a_local[0][0] + bbox_a[0],
+                        text_bounds_a_local[0][1] + bbox_a[1],
+                    ],
+                    [
+                        text_bounds_a_local[1][0] + bbox_a[0],
+                        text_bounds_a_local[1][1] + bbox_a[1],
+                    ],
+                ]
+                for x in range(len(to_translate)):
+                    if x == i:
+                        continue
+
+                    bbox_b = to_translate[x][0]
+                    text_bounds_b_local = to_translate[x][3]
+                    text_bounds_b = [
+                        [
+                            text_bounds_b_local[0][0] + bbox_b[0],
+                            text_bounds_b_local[0][1] + bbox_b[1],
+                        ],
+                        [
+                            text_bounds_b_local[1][0] + bbox_b[0],
+                            text_bounds_b_local[1][1] + bbox_b[1],
+                        ],
+                    ]
+
+                    fix_result = fix_intersection(
+                        text_bounds_a[0],
+                        text_bounds_a[1],
+                        text_bounds_b[0],
+                        text_bounds_b[1],
+                    )
+                    found_intersection = fix_result[4]
+                    if found_intersection:
+                        to_translate[i][3] = [
+                            [
+                                fix_result[0][0] - bbox_a[0],
+                                fix_result[0][1] - bbox_a[1],
+                            ],
+                            [
+                                fix_result[1][0] - bbox_a[0],
+                                fix_result[1][1] - bbox_a[1],
+                            ],
+                        ]
+                        to_translate[x][3] = [
+                            [
+                                fix_result[2][0] - bbox_b[0],
+                                fix_result[2][1] - bbox_b[1],
+                            ],
+                            [
+                                fix_result[3][0] - bbox_b[0],
+                                fix_result[3][1] - bbox_b[1],
+                            ],
+                        ]
+                        # print(
+                        #     bbox_a,
+                        #     text_bounds_a_local,
+                        #     text_bounds_a,
+                        #     "\n",
+                        #     bbox_b,
+                        #     text_bounds_b_local,
+                        #     text_bounds_b,
+                        # )
+                        # debug_image(to_translate[i][1])
+                        # debug_image(to_translate[x][1])
+                        # cv2.rectangle(
+                        #     frame,
+                        #     fix_result[0],
+                        #     fix_result[1],
+                        #     (0, 255, 255),
+                        #     1,
+                        # )
+                        # cv2.rectangle(
+                        #     frame,
+                        #     fix_result[2],
+                        #     fix_result[3],
+                        #     (0, 255, 255),
+                        #     1,
+                        # )
+                        # print("intersection found")
+
+            # third pass, draw text
+            for bbox, bubble, text_as_image, text_bounds in to_translate:
+                (x1, y1, x2, y2) = bbox
+
+                if self.translator:
+                    translation = self.translator(text_as_image)
+                    frame[y1:y2, x1:x2] = draw_text_in_bubble(
+                        bubble, text_bounds, translation
+                    )
+                else:
+                    frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, text_bounds)
 
             processed.append(frame)
         return processed
