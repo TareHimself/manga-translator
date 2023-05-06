@@ -124,7 +124,11 @@ def cv2_to_pil(img) -> Image:
 
 
 def pil_to_cv2(img) -> np.ndarray:
-    return np.array(img)[:, :, ::-1]
+    arr = np.array(img)
+    if arr.shape[2] == 4:
+        return cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGR)
+
+    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 
 def get_bounds_for_text(frame_mask):
