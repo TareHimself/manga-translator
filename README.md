@@ -30,6 +30,15 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [ ] Free text translation
 - [ ] Improve text resize algorithm, some texts are too small/big
 
+## Run
+
+```
+conda create -n manga-translator python=3.9.12
+conda activate manga-translator
+python -m pip install -r requirements.txt
+python main.py -m [live|convert -f "files"]
+```
+
 ## Datasets
 
 ### Detection
