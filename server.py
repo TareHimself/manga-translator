@@ -1,8 +1,8 @@
 import io
 import flask
 from flask import Flask, make_response
-from utils import cv2_to_pil, pil_to_cv2
-from pipelines import FullConversion
+from mt.utils import cv2_to_pil, pil_to_cv2
+from mt.pipelines import FullConversion
 from PIL import Image
 
 app = Flask(__name__)

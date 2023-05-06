@@ -1,5 +1,5 @@
 import os
-from utils import pad
+from mt.utils import pad
 
 rename_dir = "to_rename"
 for file in os.listdir(rename_dir):

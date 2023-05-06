@@ -1,20 +1,17 @@
-from typing import Any
-from ultralytics import YOLO
 import cv2
 import numpy as np
-from manga_ocr import MangaOcr
 import sys
-import requests
-import traceback
+from ultralytics import YOLO
 from requests.utils import requote_uri
-from utils import (
+from mt.utils import (
     extract_bubble,
     draw_text_in_bubble,
     debug_image,
     get_bounds_for_text,
     fix_intersection,
 )
-from translators import Translator
+from mt.translators import Translator
+from mt.ocr import BaseOcr
 
 
 class FullConversion:
@@ -23,11 +20,13 @@ class FullConversion:
         detect_model="models/detection.pt",
         seg_model="models/segmentation.pt",
         translator=Translator(),
+        ocr=BaseOcr(),
         debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
         self.detection_model = YOLO(detect_model)
         self.translator = translator
+        self.ocr = ocr
         self.debug = debug
 
     def filter_results(self, results, min_confidence=0.2):
@@ -192,8 +191,8 @@ class FullConversion:
             for bbox, bubble, text_as_image, text_bounds in to_translate:
                 (x1, y1, x2, y2) = bbox
 
-                if self.translator:
-                    translation = self.translator(text_as_image)
+                if self.translator and self.ocr:
+                    translation = self.translator(self.ocr, text_as_image)
                     frame[y1:y2, x1:x2] = draw_text_in_bubble(
                         bubble, text_bounds, translation
                     )
