@@ -23,9 +23,9 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [ ] Bubble Text hypenation
 - [ ] Create Korean ocr model or finetune existing
 - [ ] Create Chinese ocr model or finetune existing
-- [ ] Ensure Repo works on M1
-- [ ] Format and structur dataset
-- [ ] Create converters i.e. yolo => coco, my dataset => yolo etc
+- [x] Ensure Repo works on M1
+- [x] Format and structure dataset
+- [x] Create converters i.e. yolo => coco, my dataset => yolo etc
 - [ ] Free text ocr
 - [ ] Free text translation
 - [ ] Improve text resize algorithm, some texts are too small/big
