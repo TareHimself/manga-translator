@@ -1,27 +1,50 @@
+from mss import mss
 import argparse
 import cv2
 import numpy as np
-from mss import mss
 from mt.pipelines import FullConversion
 from mt.translators import HelsinkiNlpJapaneseToEnglish
 from mt.ocr import MangaOcr
+import sys
+
+print(sys.platform)
 
 
 def run_live():
     converter = FullConversion()
-    with mss() as sct:
-        monitor = sct.monitors[1]
+
+    if sys.platform == "darwin":
+        cap = cv2.VideoCapture(0)
         while True:
-            frame = np.array(sct.grab(monitor))
-            frame = cv2.resize(
-                cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB), (int(1920 / 1), int(1080 / 1))
-            )
+            et, imgBase = cap.read()
+            if et:
+                frame = imgBase
+                frame = cv2.resize(
+                    cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB),
+                    (int(1920 / 2), int(1080 / 2)),
+                )
 
-            frame = converter([frame])[0]
+                frame = converter([frame])[0]
 
-            if frame is not None:
-                cv2.imshow("frame", frame)
-                cv2.waitKey(1)
+                if frame is not None:
+                    cv2.imshow("frame", frame)
+                    cv2.waitKey(1)
+
+    else:
+        with mss() as sct:
+            monitor = sct.monitors[1]
+            while True:
+                frame = np.array(sct.grab(monitor))
+                frame = cv2.resize(
+                    cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB),
+                    (int(1920 / 1), int(1080 / 1)),
+                )
+
+                frame = converter([frame])[0]
+
+                if frame is not None:
+                    cv2.imshow("frame", frame)
+                    cv2.waitKey(1)
 
 
 def do_convert(files: list[str]):

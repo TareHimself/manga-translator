@@ -81,6 +81,8 @@ class FullConversion:
                 class_name = result.names[cls]
                 if class_name == "text_bubble":
                     bubble = frame[y1:y2, x1:x2]
+                    # if len(bubble.shape) < 3:
+                    #     continue
                     text_mask = mask[y1:y2, x1:x2]
                     cleaned, text_as_image, bubble_mask = extract_bubble(
                         bubble, text_mask
