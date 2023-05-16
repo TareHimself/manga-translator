@@ -14,6 +14,25 @@ from mt.translators import Translator
 from mt.ocr import BaseOcr
 
 
+def inpaint(image, mask, radius=2, iterations=3):
+    result = image
+    for i in range(iterations):
+        result = cv2.inpaint(
+            result,
+            mask,
+            radius,
+            cv2.INPAINT_NS,
+        )
+    return result
+
+
+def resize_percent(image, dest_percent=50):
+    width = int(image.shape[1] * dest_percent / 100)
+    height = int(image.shape[0] * dest_percent / 100)
+    dim = (width, height)
+    return cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+
+
 class FullConversion:
     def __init__(
         self,
@@ -52,10 +71,11 @@ class FullConversion:
         return filtered
 
     def __call__(self, frames: np.ndarray):
+        frames = [resize_percent(x, 50) for x in frames]
         device = 0 if sys.platform != "darwin" else "mps"
         processed = []
         for result, frame in zip(self.detection_model(frames, device=device), frames):
-            mask = np.zeros_like(frame, dtype=frame.dtype)
+            text_mask = np.zeros_like(frame, dtype=frame.dtype)
 
             segmentation_results = self.segmentation_model(frame, device=device)[0]
 
@@ -63,10 +83,14 @@ class FullConversion:
                 for seg in list(
                     map(lambda a: a.astype("int"), segmentation_results.masks.xy)
                 ):
-                    cv2.fillPoly(mask, [seg], (255, 255, 255))
+                    cv2.fillPoly(text_mask, [seg], (255, 255, 255))
 
             filtered = self.filter_results(result)
 
+            # debug_image(frame, "FRAME")
+            # debug_image(text_mask, "text mask")
+            # inpainted = inpaint(frame, cv2.cvtColor(text_mask, cv2.COLOR_BGR2GRAY), 3)
+            # debug_image(inpainted, "Inpainted")
             to_translate = []
             # First pass, mask all bubbles
             for bbox, cls, conf in filtered:
@@ -81,11 +105,19 @@ class FullConversion:
                 class_name = result.names[cls]
                 if class_name == "text_bubble":
                     bubble = frame[y1:y2, x1:x2]
-                    # if len(bubble.shape) < 3:
-                    #     continue
-                    text_mask = mask[y1:y2, x1:x2]
+                    # debug_image(frame[y1:y2, x1:x2], "FRAME")
+                    # debug_image(text_mask[y1:y2, x1:x2], "text mask")
+                    # inpainted = inpaint(
+                    #     frame[y1:y2, x1:x2],
+                    #     cv2.cvtColor(text_mask[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY),
+                    #     3,
+                    # )
+                    # debug_image(inpainted, "Inpainted")
+                    # # if len(bubble.shape) < 3:
+                    # #     continue
+                    region_text_mask = text_mask[y1:y2, x1:x2]
                     cleaned, text_as_image, bubble_mask = extract_bubble(
-                        bubble, text_mask
+                        bubble, region_text_mask
                     )
                     frame[y1:y2, x1:x2] = cleaned
 
