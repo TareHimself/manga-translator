@@ -1,12 +1,8 @@
 import argparse
 import cv2
 import numpy as np
-from mt.pipelines import FullConversion
-from mt.translators import HelsinkiNlpJapaneseToEnglish
-from mt.ocr import MangaOcr
+from translator.pipelines import FullConversion
 import sys
-
-print(sys.platform)
 
 
 def run_live():
@@ -53,7 +49,8 @@ def do_convert(files: list[str]):
     filenames = files
     converted = converter([cv2.imread(file) for file in filenames])
 
-    for filename, frame in zip(filenames, converted):
+    for filename, data in zip(filenames, converted):
+        frame = data
         ext = filename.split(".")[1]
         cv2.imwrite(
             filename[0 : len(filename) - (len(ext) + 1)] + "_converted." + ext,

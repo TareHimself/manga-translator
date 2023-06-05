@@ -9,6 +9,8 @@ from hyphen import Hyphenator
 from hyphen.textwrap2 import wrap
 import shutil
 from tqdm import tqdm
+from .inpainting import inpaint
+from collections import deque
 
 en_hyphenator = Hyphenator("en_US")
 
@@ -21,6 +23,18 @@ def adjust_contrast_brightness(img, contrast: float = 1.0, brightness: int = 0):
     """
     brightness += int(round(255 * (1 - contrast) / 2))
     return cv2.addWeighted(img, contrast, img, 0, brightness)
+
+
+def has_white(image):
+    # Set RGB values for white
+    white_lower = np.array([200, 200, 200], dtype=np.uint8)
+    white_upper = np.array([255, 255, 255], dtype=np.uint8)
+
+    # Find white pixels within the specified range
+    white_pixels = cv2.inRange(image, white_lower, white_upper)
+
+    # Check if any white pixels were found
+    return cv2.countNonZero(white_pixels) > 0
 
 
 def debug_image(img, name="debug"):
@@ -50,13 +64,14 @@ def do_mask(a, b, mask, inv=False):
 
 
 def clean_text(frame, frame_mask):
-    cleaned = frame.copy()
     text = frame.copy()
-    cleaned = do_mask(
-        cleaned,
-        np.full(cleaned.shape, 255, dtype=cleaned.dtype),
-        frame_mask,
-    )
+    # cleaned = frame.copy()
+    # cleaned = do_mask(
+    #     cleaned,
+    #     np.full(cleaned.shape, 255, dtype=cleaned.dtype),
+    #     frame_mask,
+    # )
+    cleaned = pil_to_cv2(inpaint(cv2_to_pil(frame), cv2_to_pil(frame_mask)))
     text = do_mask(text, np.full(text.shape, 255, dtype=text.dtype), frame_mask, True)
     return text, cleaned
 
@@ -119,6 +134,17 @@ def extract_bubble(frame, frame_mask):
     return do_mask(cleaned, bubble_color, mask), text, mask
 
 
+def generate_bubble_mask(frame, frame_text_mask, frame_cleaned):
+    text = do_mask(
+        frame.copy(),
+        np.full(frame.shape, 255, dtype=frame.dtype),
+        frame_text_mask,
+        True,
+    )
+
+    return text, make_bubble_mask(frame_cleaned)
+
+
 def cv2_to_pil(img) -> Image:
     return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
@@ -165,6 +191,10 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
         else:
             return fix_intersection(b1, b2, a1, a2, True, True)
 
+    a_width = a2[0] - a1[0]
+    a_height = a2[1] - a1[1]
+    b_width = b2[0] - b1[0]
+    b_height = b2[1] - b1[1]
     # a is above b
     if a1[1] < b1[1]:
         is_intersecting = a1[0] < b1[0] < a2[0] and a1[1] < b1[1] < a2[1]
@@ -175,8 +205,13 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
 
         midpoint_y = abs(int(((a2[1] - b1[1]) / 2))) + 1
 
-        b1[0] += midpoint_x
-        a2[0] -= midpoint_x
+        # if a_height < b_height:
+        #     b1[1] = a2[1]
+        # else:
+        #     a2[1] = b1[1]
+
+        # b1[0] += midpoint_x
+        # a2[0] -= midpoint_x
         return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
     else:
         is_intersecting = a1[0] < b1[0] < a2[0] and b1[1] < a1[1] < b2[1]
@@ -187,10 +222,52 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
 
         midpoint_y = abs(int(((b2[1] - a1[0]) / 2))) + 1
 
-        b1[0] += midpoint_x
-        a2[0] -= midpoint_x
+        # if b_height < a_height:
+        #     a1[1] = b2[1]
+        # else:
+        #     b2[1] = a1[1]
+        # b1[0] += midpoint_x
+        # a2[0] -= midpoint_x
 
         return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
+
+
+def inpaint_optimized(
+    frame: np.ndarray, mask: np.ndarray, max_height=512, max_width=512
+):
+    h, w, c = frame.shape
+    final = np.zeros_like(frame)
+    if h > max_height or w > max_width:
+        divisions_y = math.ceil(h / max_height)
+        divisions_x = math.ceil(w / max_width)
+
+        indices_y = []
+        indices_x = []
+        for i in range(divisions_y):
+            if i == divisions_y - 1:
+                indices_y.append((max_width * i, h))
+            else:
+                indices_y.append((max_height * i, max_height * (i + 1)))
+
+        for i in range(divisions_x):
+            if i == divisions_x - 1:
+                indices_x.append((max_width * i, w))
+            else:
+                indices_x.append((max_width * i, max_width * (i + 1)))
+
+        for y_coord in indices_y:
+            for x_coord in indices_x:
+                y1, y2 = y_coord
+                x1, x2 = x_coord
+                mask_region = mask[y1:y2, x1:x2]
+                frame_region = frame[y1:y2, x1:x2]
+                if has_white(mask_region):
+                    final[y1:y2, x1:x2] = pil_to_cv2(
+                        inpaint(cv2_to_pil(frame_region), cv2_to_pil(mask_region))
+                    )
+                else:
+                    final[y1:y2, x1:x2] = frame_region
+        return final
 
 
 def pixels_to_pt(pixels):
@@ -201,8 +278,65 @@ def pt_to_pixels(pt):
     return pt * (16 / 12)
 
 
-def wrap_text(text, max_chars):
-    return wrap(text, max_chars, use_hyphenator=en_hyphenator)
+def try_merge_hypnenated(text: list[str], max_chars: int):
+    final = []
+    total = deque(text)
+    current = total.popleft()
+
+    while len(total) > 0 or current != "":
+        if (
+            len(total) > 0
+            and current.endswith("-")
+            and len(current[:-1] + total[0]) <= max_chars
+        ):
+            current = current[:-1] + total.popleft()
+        else:
+            final.append(current)
+            current = total.popleft() if len(total) > 0 else ""
+
+    return final
+
+
+def wrap_text(text: str, max_chars: int):
+    total = deque(text.split(" "))
+    current_word = total.popleft()
+    lines = []
+    current_line = ""
+    while len(total) > 0 or len(current_word) > 0:
+        sep = " " if len(current_line) > 0 else ""
+        new_current = current_line + sep + current_word
+        if len(new_current) > max_chars:
+            space_left = max_chars - len(current_line + sep)
+            pairs = en_hyphenator.pairs(current_word)
+            if len(pairs) == 0:
+                if current_line == "" and len(current_word) > max_chars:
+                    return None
+                lines.append(current_line)
+                current_line = ""
+                continue
+
+            pair = min(pairs, key=lambda a: len(current_line + sep + a[0] + "-"))
+            if len(current_line + sep + pair[0] + "-") > space_left:
+                lines.append(current_line)
+                current_line = ""
+                current_word = pair[0] + "-"
+                total.insert(0, pair[1])
+                continue
+            lines.append(current_line + sep + pair[0] + "-")
+            current_line = ""
+            current_word = pair[1]
+        elif len(total) == 0:
+            lines.append(current_line + sep + current_word)
+            current_word = ""
+        else:
+            current_line = new_current
+            current_word = total.popleft() if len(total) else ""
+
+    return try_merge_hypnenated(lines, max_chars)
+
+
+# [print(x, en_hyphenator.pairs(x)) for x in text.split(" ")]
+# return wrap(text, max_chars, use_hyphenator=en_hyphenator)
 
 
 def get_average_font_size(font, text="some text here"):
@@ -220,24 +354,56 @@ def get_best_font_size(
     start_size=18,
     step=1,
     min_chars_per_line=6,
+    initial_iterations=0,
 ):
     current_font_size = start_size
     current_font = None
     max_width, max_height = wh
 
-    iterations = 0
+    iterations = initial_iterations
     while True:
         iterations += 1
-        current_font = ImageFont.truetype(font_file, current_font_size)
+
         if current_font_size < 0:
             return None, None, None, iterations
+
+        # if current_font_size < 6:
+        #     print(
+        #         "REDUCING MIN CHARACTERS FROM",
+        #         min_chars_per_line,
+        #         "TO",
+        #         min_chars_per_line - 1,
+        #     )
+        #     return get_best_font_size(
+        #         text,
+        #         wh,
+        #         font_file,
+        #         space_between_lines,
+        #         start_size,
+        #         step,
+        #         min_chars_per_line - 1,
+        #         iterations,
+        #     )
+        current_font = ImageFont.truetype(font_file, current_font_size)
         cur_f_width, cur_f_height = get_average_font_size(current_font, text)
         chars_per_line = math.floor(max_width / cur_f_width)
+        # print(
+        #     "DEBUG",
+        #     chars_per_line,
+        #     max_width,
+        #     cur_f_width,
+        #     current_font_size,
+        #     min_chars_per_line,
+        # )
         if chars_per_line < min_chars_per_line:
             current_font_size -= step
             continue
 
+        # print(chars_per_line)
         lines = wrap_text(text, chars_per_line)
+        if lines is None:
+            current_font_size -= step
+            continue
 
         height_needed = (len(lines) * cur_f_height) + (
             (len(lines) - 1) * space_between_lines
@@ -258,10 +424,10 @@ def draw_text_in_bubble(
     max_width = pt2[0] - pt1[0]
 
     # fill background incase of segmentation errors
-    cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
+    # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
     # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
-    space_between_lines = 0
+    space_between_lines = 2
     font_size, chars_per_line, line_height, iters = get_best_font_size(
         text,
         (max_width, max_height),
@@ -270,6 +436,17 @@ def draw_text_in_bubble(
         30,
         1,
     )
+
+    # frame = cv2.putText(
+    #     frame,
+    #     f"{font_size}",
+    #     (0, 20),
+    #     cv2.FONT_HERSHEY_SIMPLEX,
+    #     0.2,
+    #     (255, 0, 0),
+    #     1,
+    #     cv2.LINE_AA,
+    # )
 
     # print(text, font_size, chars_per_line, line_height, iters)
     if not font_size:
@@ -289,6 +466,7 @@ def draw_text_in_bubble(
             (
                 draw_x + abs(((max_width - w) / 2)),
                 draw_y
+                + space_between_lines
                 + (
                     (
                         max_height

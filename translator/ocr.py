@@ -20,6 +20,8 @@ class BaseOcr:
 
 
 class MangaOcr(BaseOcr):
+    """Only Supports Japanese"""
+
     def __init__(self) -> None:
         super().__init__()
         self.manga_ocr = MangaOcrPackage()

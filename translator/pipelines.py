@@ -3,27 +3,27 @@ import numpy as np
 import sys
 from ultralytics import YOLO
 from requests.utils import requote_uri
-from mt.utils import (
-    extract_bubble,
+from translator.utils import (
+    generate_bubble_mask,
     draw_text_in_bubble,
-    debug_image,
     get_bounds_for_text,
     fix_intersection,
+    inpaint_optimized,
 )
-from mt.translators import Translator
-from mt.ocr import BaseOcr
+from translator.translators import Translator
+from translator.ocr import BaseOcr
 
 
-def inpaint(image, mask, radius=2, iterations=3):
-    result = image
-    for i in range(iterations):
-        result = cv2.inpaint(
-            result,
-            mask,
-            radius,
-            cv2.INPAINT_NS,
-        )
-    return result
+# def inpaint(image, mask, radius=2, iterations=3):
+#     result = image
+#     for i in range(iterations):
+#         result = cv2.inpaint(
+#             result,
+#             mask,
+#             radius,
+#             cv2.INPAINT_NS,
+#         )
+#     return result
 
 
 def resize_percent(image, dest_percent=50):
@@ -48,7 +48,7 @@ class FullConversion:
         self.ocr = ocr
         self.debug = debug
 
-    def filter_results(self, results, min_confidence=0.2):
+    def filter_results(self, results, min_confidence=0.6):
         bounding_boxes = np.array(results.boxes.xyxy.cpu(), dtype="int")
 
         classes = np.array(results.boxes.cls.cpu(), dtype="int")
@@ -71,7 +71,7 @@ class FullConversion:
         return filtered
 
     def __call__(self, frames: np.ndarray):
-        frames = [resize_percent(x, 50) for x in frames]
+        # frames = [resize_percent(x, 50) for x in frames]
         device = 0 if sys.platform != "darwin" else "mps"
         processed = []
         for result, frame in zip(self.detection_model(frames, device=device), frames):
@@ -87,6 +87,8 @@ class FullConversion:
 
             filtered = self.filter_results(result)
 
+            frame_clean = inpaint_optimized(frame, text_mask)
+            # debug_image(frame_clean, "Cleaned")
             # debug_image(frame, "FRAME")
             # debug_image(text_mask, "text mask")
             # inpainted = inpaint(frame, cv2.cvtColor(text_mask, cv2.COLOR_BGR2GRAY), 3)
@@ -105,6 +107,8 @@ class FullConversion:
                 class_name = result.names[cls]
                 if class_name == "text_bubble":
                     bubble = frame[y1:y2, x1:x2]
+                    bubble_clean = frame_clean[y1:y2, x1:x2]
+                    bubble_text_mask = text_mask[y1:y2, x1:x2]
                     # debug_image(frame[y1:y2, x1:x2], "FRAME")
                     # debug_image(text_mask[y1:y2, x1:x2], "text mask")
                     # inpainted = inpaint(
@@ -115,14 +119,13 @@ class FullConversion:
                     # debug_image(inpainted, "Inpainted")
                     # # if len(bubble.shape) < 3:
                     # #     continue
-                    region_text_mask = text_mask[y1:y2, x1:x2]
-                    cleaned, text_as_image, bubble_mask = extract_bubble(
-                        bubble, region_text_mask
+                    text_only, bubble_mask = generate_bubble_mask(
+                        bubble, bubble_text_mask, bubble_clean
                     )
-                    frame[y1:y2, x1:x2] = cleaned
 
+                    frame[y1:y2, x1:x2] = bubble_clean
                     text_bounds = get_bounds_for_text(bubble_mask)
-                    to_translate.append([bbox, bubble, text_as_image, text_bounds])
+                    to_translate.append([bbox, bubble, text_only, text_bounds])
 
                 if self.debug:
                     cv2.putText(

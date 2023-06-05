@@ -3,8 +3,8 @@ import requests
 import traceback
 from transformers import pipeline
 from requests.utils import requote_uri
-from mt.utils import cv2_to_pil
-from mt.ocr import BaseOcr, OcrResult
+from translator.utils import cv2_to_pil
+from translator.ocr import BaseOcr, OcrResult
 
 
 class Translator:
@@ -22,6 +22,8 @@ class Translator:
 
 
 class DeepLTranslator(Translator):
+    """The Best but it requires an auth token from here https://www.deepl.com/translator"""
+
     def __init__(self, auth_token=None) -> None:
         super().__init__()
         self.auth_token = auth_token
@@ -51,6 +53,8 @@ class DeepLTranslator(Translator):
 
 
 class GoogleTranslateTranslator(Translator):
+    """Not Yet Implemented"""
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -59,6 +63,8 @@ class GoogleTranslateTranslator(Translator):
 
 
 class HelsinkiNlpJapaneseToEnglish(Translator):
+    """Uses this model on hugging face https://huggingface.co/Helsinki-NLP/opus-mt-ja-en"""
+
     def __init__(self) -> None:
         super().__init__()
         self.pipeline = pipeline("translation", model="Helsinki-NLP/opus-mt-ja-en")

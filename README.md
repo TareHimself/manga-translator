@@ -7,25 +7,27 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 ## How ?
 
 - [Yolo](https://github.com/ultralytics/ultralytics) for bubble recognition and text segmentation
-- Open CV for bubble clean up and masking
+- Open CV for bubble and masking
 - PIL for text replacement
-- Have not decided on ocr tech or translation method
+- Api's or neural networks for translation
+- Deepfillv2 for inpainting and bubble cleanup
 
 ## Progress
 
+- [x] Bubble inpainting using [deepfillv2](https://arxiv.org/abs/1806.03589) credit to [nipponjo](https://github.com/nipponjo) and his [implementation](https://github.com/TareHimself/deepfillv2-pytorch)
 - [x] Bubble recognition (should improve with more training data)
 - [x] Free text recognition (should improve with more training data)
 - [x] Bubble text extraction
 - [x] Bubble masking
 - [x] Bubble text insertion
-- [ ] Bubble Text ocr
+- [x] Bubble Text ocr
 - [x] Bubble Text translation
-- [ ] Bubble Text hypenation
-- [ ] Create Korean ocr model or finetune existing
-- [ ] Create Chinese ocr model or finetune existing
+- [x] Bubble Text hypenation
 - [x] Ensure Repo works on M1
 - [x] Format and structure dataset
 - [x] Create converters i.e. yolo => coco, my dataset => yolo etc
+- [ ] Create Korean ocr model or finetune existing
+- [ ] Create Chinese ocr model or finetune existing
 - [ ] Free text ocr
 - [ ] Free text translation
 - [ ] Improve text resize algorithm, some texts are too small/big
