@@ -7,3 +7,4 @@ Pillow==9.5.0
 PyHyphen==4.0.3
 Requests==2.29.0
 ultralytics==8.0.87
+google-cloud-translate==2.0.1

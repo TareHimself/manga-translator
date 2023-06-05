@@ -281,7 +281,7 @@ def pt_to_pixels(pt):
 def try_merge_hypnenated(text: list[str], max_chars: int):
     final = []
     total = deque(text)
-    current = total.popleft()
+    current = total.popleft().strip()
 
     while len(total) > 0 or current != "":
         if (
@@ -289,7 +289,8 @@ def try_merge_hypnenated(text: list[str], max_chars: int):
             and current.endswith("-")
             and len(current[:-1] + total[0]) <= max_chars
         ):
-            current = current[:-1] + total.popleft()
+            current = current[:-1] + total.popleft().strip()
+
         else:
             final.append(current)
             current = total.popleft() if len(total) > 0 else ""
@@ -307,7 +308,12 @@ def wrap_text(text: str, max_chars: int):
         new_current = current_line + sep + current_word
         if len(new_current) > max_chars:
             space_left = max_chars - len(current_line + sep)
-            pairs = en_hyphenator.pairs(current_word)
+
+            try:
+                pairs = en_hyphenator.pairs(current_word)
+            except:
+                print("EXCEPTION WHEN HYPHENATING:", current_word)
+                pairs = []
             if len(pairs) == 0:
                 if current_line == "" and len(current_word) > max_chars:
                     return None
@@ -318,10 +324,14 @@ def wrap_text(text: str, max_chars: int):
             pair = min(pairs, key=lambda a: len(current_line + sep + a[0] + "-"))
             if len(current_line + sep + pair[0] + "-") > space_left:
                 lines.append(current_line)
-                current_line = ""
-                current_word = pair[0] + "-"
-                total.insert(0, pair[1])
-                continue
+                if len(pair[0] + "-") <= max_chars:
+                    lines.append(pair[0] + "-")
+                    current_line = ""
+                    current_word = pair[1]
+                    continue
+                else:
+                    return None
+
             lines.append(current_line + sep + pair[0] + "-")
             current_line = ""
             current_word = pair[1]

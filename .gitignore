@@ -3,3 +3,4 @@ runs
 *.pyc
 .DS_Store
 datasets/*
+*.json

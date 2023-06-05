@@ -74,10 +74,14 @@ class FullConversion:
         # frames = [resize_percent(x, 50) for x in frames]
         device = 0 if sys.platform != "darwin" else "mps"
         processed = []
-        for result, frame in zip(self.detection_model(frames, device=device), frames):
+        for result, frame in zip(
+            self.detection_model(frames, device=device, verbose=False), frames
+        ):
             text_mask = np.zeros_like(frame, dtype=frame.dtype)
 
-            segmentation_results = self.segmentation_model(frame, device=device)[0]
+            segmentation_results = self.segmentation_model(
+                frame, device=device, verbose=False, boxes=False
+            )[0]
 
             if segmentation_results.masks is not None:
                 for seg in list(

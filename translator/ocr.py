@@ -1,5 +1,4 @@
 import numpy
-from manga_ocr import MangaOcr as MangaOcrPackage
 
 
 class OcrResult:
@@ -23,6 +22,8 @@ class MangaOcr(BaseOcr):
     """Only Supports Japanese"""
 
     def __init__(self) -> None:
+        from manga_ocr import MangaOcr as MangaOcrPackage
+
         super().__init__()
         self.manga_ocr = MangaOcrPackage()
 

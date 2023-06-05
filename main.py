@@ -3,6 +3,11 @@ import cv2
 import numpy as np
 from translator.pipelines import FullConversion
 import sys
+import os
+import math
+import re
+
+EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
 
 
 def run_live():
@@ -47,15 +52,19 @@ def run_live():
 def do_convert(files: list[str]):
     converter = FullConversion()
     filenames = files
-    converted = converter([cv2.imread(file) for file in filenames])
-
-    for filename, data in zip(filenames, converted):
-        frame = data
-        ext = filename.split(".")[1]
-        cv2.imwrite(
-            filename[0 : len(filename) - (len(ext) + 1)] + "_converted." + ext,
-            frame,
-        )
+    batches = math.ceil(len(filenames) / 4)
+    for i in range(batches):
+        files_to_convert = filenames[i * 4 : (i + 1) * 4]
+        for filename, data in zip(
+            files_to_convert, converter([cv2.imread(file) for file in files_to_convert])
+        ):
+            frame = data
+            ext = re.findall(EXTENSION_REGEX, filename)[0]
+            cv2.imwrite(
+                filename[0 : len(filename) - (len(ext) + 1)] + "_converted." + ext,
+                frame,
+            )
+        print(f"Converted Batch {i + 1}/{batches}")
 
 
 def main():
@@ -71,7 +80,12 @@ def main():
         required=True,
         help="What mode to run",
     )
-    parser.add_argument("-f", "--files", nargs="+", help="A list of images to convert")
+    parser.add_argument(
+        "-f",
+        "--files",
+        nargs="+",
+        help="A list of images to convert or path to a folder of images",
+    )
 
     args = parser.parse_args()
 
@@ -84,7 +98,13 @@ def main():
             if args.files is None:
                 parser.print_help()
             else:
-                do_convert(args.files)
+                files = args.files
+                if len(files) == 1 and os.path.isdir(files[0]):
+                    do_convert(
+                        [os.path.join(files[0], x) for x in os.listdir(files[0])]
+                    )
+                else:
+                    do_convert(files)
 
 
 if __name__ == "__main__":

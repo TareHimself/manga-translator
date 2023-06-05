@@ -1,6 +1,7 @@
 import numpy
 import requests
 import traceback
+import os
 from transformers import pipeline
 from requests.utils import requote_uri
 from translator.utils import cv2_to_pil
@@ -55,11 +56,17 @@ class DeepLTranslator(Translator):
 class GoogleTranslateTranslator(Translator):
     """Not Yet Implemented"""
 
-    def __init__(self) -> None:
+    def __init__(self, service_account_key_path="") -> None:
         super().__init__()
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+        from google.cloud import translate_v2 as translate
+
+        self.trans = translate.Client()
 
     def translate(self, ocr_result: OcrResult):
-        return super().translate(ocr_result)
+        return self.trans.translate(
+            ocr_result.text, source_language=ocr_result.language, target_language="en"
+        )["translatedText"]
 
 
 class HelsinkiNlpJapaneseToEnglish(Translator):
