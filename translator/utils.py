@@ -233,41 +233,124 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
 
 
 def inpaint_optimized(
-    frame: np.ndarray, mask: np.ndarray, max_height=512, max_width=512
+    frame: np.ndarray,
+    mask: np.ndarray,
+    filtered: list,
+    max_height=256,
+    max_width=256,
+    method=0,
 ):
     h, w, c = frame.shape
-    final = np.zeros_like(frame)
-    if h > max_height or w > max_width:
-        divisions_y = math.ceil(h / max_height)
-        divisions_x = math.ceil(w / max_width)
 
-        indices_y = []
-        indices_x = []
-        for i in range(divisions_y):
-            if i == divisions_y - 1:
-                indices_y.append((max_width * i, h))
-            else:
-                indices_y.append((max_height * i, max_height * (i + 1)))
+    if method == 0:
+        # only inpaint sections with masks and isolate said masks
+        final = frame.copy()
 
-        for i in range(divisions_x):
-            if i == divisions_x - 1:
-                indices_x.append((max_width * i, w))
-            else:
-                indices_x.append((max_width * i, max_width * (i + 1)))
+        half_height = int(max_height / 2)
+        half_width = int(max_width / 2)
 
-        for y_coord in indices_y:
-            for x_coord in indices_x:
-                y1, y2 = y_coord
-                x1, x2 = x_coord
-                mask_region = mask[y1:y2, x1:x2]
-                frame_region = frame[y1:y2, x1:x2]
-                if has_white(mask_region):
-                    final[y1:y2, x1:x2] = pil_to_cv2(
-                        inpaint(cv2_to_pil(frame_region), cv2_to_pil(mask_region))
-                    )
+        for bbox, cls, conf in filtered:
+            bx1, by1, bx2, by2 = bbox
+            bx1, by1, bx2, by2 = round(bx1), round(by1), round(bx2), round(by2)
+
+            half_bx = round((bx2 - bx1) / 2)
+            half_by = round((by2 - by1) / 2)
+            midpoint_x, midpoint_y = round(bx1 + (half_bx)), round(by1 + (half_by))
+
+            x1, y1 = max(0, midpoint_x - half_width), max(0, midpoint_y - half_height)
+
+            x2, y2 = min(w, midpoint_x + half_width), min(h, midpoint_y + half_height)
+
+            if y2 < by2:
+                y2 = by2
+
+            if y1 > by1:
+                y1 = by1
+
+            if x2 < bx2:
+                x2 = bx2
+
+            if x1 > bx1:
+                x1 = bx1
+
+            overflow_x = (x2 - x1) % 8
+            x1_adjust = 0
+            if overflow_x != 0:
+                if x2 > x1:
+                    x2 -= overflow_x
                 else:
-                    final[y1:y2, x1:x2] = frame_region
+                    x1 += overflow_x
+                    x1_adjust = overflow_x
+
+            overflow_y = (y2 - y1) % 8
+
+            y1_adjust = 0
+            if overflow_y != 0:
+                if y2 > y1:
+                    y2 -= overflow_y
+                else:
+                    y1 += overflow_y
+                    y1_adjust = overflow_y
+
+            bx1 = bx1 - (x1 + x1_adjust)
+            bx2 = bx2 - (x1 + x1_adjust)
+            by1 = by1 - (y1 + y1_adjust)
+            by2 = by2 - (y1 + y1_adjust)
+
+            region_mask = mask[y1:y2, x1:x2].copy()
+            focus_mask = cv2.rectangle(
+                np.zeros_like(region_mask),
+                (bx1, by1),
+                (bx2, by2),
+                (255, 255, 255),
+                -1,
+            )
+            region_mask = do_mask(
+                region_mask, np.zeros_like(region_mask), focus_mask, True
+            )
+
+            if has_white(region_mask):
+                final[y1:y2, x1:x2] = pil_to_cv2(
+                    inpaint(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(region_mask))
+                )
+
         return final
+    elif method == 1:
+        # divide the image into a grid and inpaint each part if it has a mask in it
+        final = np.zeros_like(frame)
+        if h > max_height or w > max_width:
+            divisions_y = math.ceil(h / max_height)
+            divisions_x = math.ceil(w / max_width)
+
+            indices_y = []
+            indices_x = []
+            for i in range(divisions_y):
+                if i == divisions_y - 1:
+                    indices_y.append((h - max_height, h))
+                else:
+                    indices_y.append((max_height * i, max_height * (i + 1)))
+
+            for i in range(divisions_x):
+                if i == divisions_x - 1:
+                    indices_x.append((w - max_width, w))
+                else:
+                    indices_x.append((max_width * i, max_width * (i + 1)))
+
+            for y_coord in indices_y:
+                for x_coord in indices_x:
+                    y1, y2 = y_coord
+                    x1, x2 = x_coord
+                    mask_region = mask[y1:y2, x1:x2]
+                    frame_region = frame[y1:y2, x1:x2]
+                    if has_white(mask_region):
+                        final[y1:y2, x1:x2] = pil_to_cv2(
+                            inpaint(cv2_to_pil(frame_region), cv2_to_pil(mask_region))
+                        )
+                    else:
+                        final[y1:y2, x1:x2] = frame_region
+            return final
+    else:
+        return frame
 
 
 def pixels_to_pt(pixels):
@@ -310,7 +393,13 @@ def wrap_text(text: str, max_chars: int):
             space_left = max_chars - len(current_line + sep)
 
             try:
-                pairs = en_hyphenator.pairs(current_word)
+                if "-" in current_word:
+                    idx = current_word.index("-")
+                    total.appendleft(current_word[idx + 1 :])
+                    current_word = current_word[:idx]
+                    continue
+                else:
+                    pairs = en_hyphenator.pairs(current_word)
             except:
                 print("EXCEPTION WHEN HYPHENATING:", current_word)
                 pairs = []

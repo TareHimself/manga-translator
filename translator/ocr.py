@@ -1,4 +1,5 @@
 import numpy
+from translator.utils import cv2_to_pil
 
 
 class OcrResult:
@@ -8,6 +9,8 @@ class OcrResult:
 
 
 class BaseOcr:
+    """Base Class for all OCR classes"""
+
     def __init__(self) -> None:
         pass
 
@@ -28,4 +31,8 @@ class MangaOcr(BaseOcr):
         self.manga_ocr = MangaOcrPackage()
 
     def do_ocr(self, text: numpy.ndarray):
-        return OcrResult(self.manga_ocr(text), "ja")
+        return OcrResult(self.manga_ocr(cv2_to_pil(text)), "ja")
+
+
+def get_ocr():
+    return [BaseOcr, MangaOcr]

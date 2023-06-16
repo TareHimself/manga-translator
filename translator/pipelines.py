@@ -80,7 +80,7 @@ class FullConversion:
             text_mask = np.zeros_like(frame, dtype=frame.dtype)
 
             segmentation_results = self.segmentation_model(
-                frame, device=device, verbose=False, boxes=False
+                frame, device=device, verbose=False
             )[0]
 
             if segmentation_results.masks is not None:
@@ -91,7 +91,11 @@ class FullConversion:
 
             filtered = self.filter_results(result)
 
-            frame_clean = inpaint_optimized(frame, text_mask)
+            frame_clean = inpaint_optimized(
+                frame,
+                text_mask,
+                filtered,  # segmentation_results.boxes.xyxy.cpu().numpy()
+            )
             # debug_image(frame_clean, "Cleaned")
             # debug_image(frame, "FRAME")
             # debug_image(text_mask, "text mask")

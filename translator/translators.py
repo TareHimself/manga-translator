@@ -9,6 +9,8 @@ from translator.ocr import BaseOcr, OcrResult
 
 
 class Translator:
+    """Base Class for all Translator classes"""
+
     def __init__(self) -> None:
         pass
 
@@ -16,7 +18,7 @@ class Translator:
         return self.translate(self.apply_ocr(ocr, text))
 
     def apply_ocr(self, ocr: BaseOcr, text: numpy.ndarray) -> OcrResult:
-        return ocr(cv2_to_pil(text))
+        return ocr(text)
 
     def translate(self, ocr_result: OcrResult) -> str:
         return ocr_result.text
@@ -54,7 +56,7 @@ class DeepLTranslator(Translator):
 
 
 class GoogleTranslateTranslator(Translator):
-    """Not Yet Implemented"""
+    """Translates using google translate"""
 
     def __init__(self, service_account_key_path="") -> None:
         super().__init__()
@@ -70,7 +72,7 @@ class GoogleTranslateTranslator(Translator):
 
 
 class HelsinkiNlpJapaneseToEnglish(Translator):
-    """Uses this model on hugging face https://huggingface.co/Helsinki-NLP/opus-mt-ja-en"""
+    """Translates using this model on hugging face https://huggingface.co/Helsinki-NLP/opus-mt-ja-en"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -81,3 +83,12 @@ class HelsinkiNlpJapaneseToEnglish(Translator):
             return self.pipeline(ocr_result.text)[0]["translation_text"]
 
         return super().translate(ocr_result)
+
+
+def get_translators():
+    return [
+        Translator,
+        DeepLTranslator,
+        GoogleTranslateTranslator,
+        HelsinkiNlpJapaneseToEnglish,
+    ]

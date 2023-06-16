@@ -8,8 +8,8 @@ from ultralytics import YOLO
 # )
 
 # #segmentation
-model = YOLO("yolov8m-seg.pt")  # YOLO("yolov8m-seg.pt")
+model = YOLO("./models/segmentation.pt")  # YOLO("yolov8m-seg.pt")
 
 model.train(
-    data="train_seg.yaml", epochs=400, batch=10, patience=100, device=0, workers=0
+    data="train_seg.yaml", epochs=1000, batch=10, patience=100, device=0, workers=0
 )

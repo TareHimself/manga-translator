@@ -1,17 +1,54 @@
 import argparse
+import ast
 import cv2
-import numpy as np
-from translator.pipelines import FullConversion
 import sys
 import os
 import math
 import re
+import numpy as np
+from translator.pipelines import FullConversion
+from translator.translators import get_translators
+from translator.ocr import get_ocr
+import json
 
 EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
 
 
-def run_live():
-    converter = FullConversion()
+class SmartFormatter(argparse.HelpFormatter):
+    def _split_lines(self, text, width):
+        if text.startswith("R|"):
+            return text[2:].splitlines()
+        # this is the RawTextHelpFormatter._split_lines
+        return argparse.HelpFormatter._split_lines(self, text, width)
+
+
+def convert_to_options_list(classes: list):
+    result = ""
+    for x in range(len(classes)):
+        item = classes[x]
+        result += f"{x}) {item.__name__} => {item.__doc__}\n"
+
+    return result[:-1]
+
+
+def json_to_args(args_str: str):
+    args = {}
+    for item in args_str.strip().split(","):
+        if "=" not in item:
+            continue
+        a = item.strip()
+        equ_idx = a.index("=")
+        key = a[0:equ_idx]
+        value = eval(a[equ_idx + 1 :])
+        args[key] = value
+    return args
+
+
+def run_live(tran: int, tran_args: str, ocr: int, ocr_args: str):
+    converter = FullConversion(
+        translator=get_translators()[tran](**json_to_args(tran_args)),
+        ocr=get_ocr()[ocr](**json_to_args(ocr_args)),
+    )
 
     if sys.platform == "darwin":
         cap = cv2.VideoCapture(0)
@@ -33,13 +70,14 @@ def run_live():
     else:
         from mss import mss
 
+        scale = 2
         with mss() as sct:
             monitor = sct.monitors[1]
             while True:
                 frame = np.array(sct.grab(monitor))
                 frame = cv2.resize(
                     cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB),
-                    (int(1920 / 1), int(1080 / 1)),
+                    (int(1920 / scale), int(1080 / scale)),
                 )
 
                 frame = converter([frame])[0]
@@ -49,8 +87,11 @@ def run_live():
                     cv2.waitKey(1)
 
 
-def do_convert(files: list[str]):
-    converter = FullConversion()
+def do_convert(files: list[str], tran: int, tran_args: str, ocr: int, ocr_args: str):
+    converter = FullConversion(
+        translator=get_translators()[tran](**json_to_args(tran_args)),
+        ocr=get_ocr()[ocr](**json_to_args(ocr_args)),
+    )
     filenames = files
     batches = math.ceil(len(filenames) / 4)
     for i in range(batches):
@@ -71,6 +112,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="Manga Translator",
         description="Translates Manga Chapters",
+        formatter_class=SmartFormatter,
     )
 
     parser.add_argument(
@@ -80,6 +122,7 @@ def main():
         required=True,
         help="What mode to run",
     )
+
     parser.add_argument(
         "-f",
         "--files",
@@ -87,13 +130,52 @@ def main():
         help="A list of images to convert or path to a folder of images",
     )
 
+    parser.add_argument(
+        "-o",
+        "--ocr",
+        default=0,
+        type=int,
+        help="R|Set the index of the ocr class to use. must be one of the following\n"
+        + convert_to_options_list(get_ocr()),
+        required=False,
+    )
+
+    parser.add_argument(
+        "-oa",
+        "--ocr-args",
+        default="",
+        type=str,
+        help="Set ocr class args i.e. 'key=value , key2=value'",
+        required=False,
+    )
+
+    parser.add_argument(
+        "-t",
+        "--tra",
+        default=0,
+        type=int,
+        help="R|Set the index of the translator class to use. must be one of the following\n"
+        + convert_to_options_list(get_translators()),
+        required=False,
+    )
+
+    parser.add_argument(
+        "-ta",
+        "--tra-args",
+        default="",
+        type=str,
+        help="Set translator class args i.e. 'key=value , key2=value'",
+        required=False,
+    )
+
     args = parser.parse_args()
 
+    print(args)
     if args.mode is None:
         parser.print_help()
     else:
         if args.mode == "live":
-            run_live()
+            run_live(args.tra, args.tra_args, args.ocr, args.ocr_args)
         elif args.mode == "convert":
             if args.files is None:
                 parser.print_help()
@@ -101,10 +183,20 @@ def main():
                 files = args.files
                 if len(files) == 1 and os.path.isdir(files[0]):
                     do_convert(
-                        [os.path.join(files[0], x) for x in os.listdir(files[0])]
+                        [os.path.join(files[0], x) for x in os.listdir(files[0])],
+                        args.tra,
+                        args.tra_args,
+                        args.ocr,
+                        args.ocr_args,
                     )
                 else:
-                    do_convert(files)
+                    do_convert(
+                        files,
+                        args.tra,
+                        args.tra_args,
+                        args.ocr,
+                        args.ocr_args,
+                    )
 
 
 if __name__ == "__main__":
