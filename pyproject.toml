@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "manga-translator"
+version = "0.1.0"
+description = ""
+authors = ["Tare Ebelo <75279482+TareHimself@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+poethepoet = "^0.20.0"
+ultralytics = "^8.0.118"
+pillow = "^9.5.0"
+pyhyphen = "^4.0.3"
+google-cloud-translate = "^3.11.1"
+mss = "^9.0.1"
+manga-ocr = "^0.1.10"
+largestinteriorrectangle = "^0.2.0"
+
+[tool.poe.tasks]
+torch-win = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+torch-mac ="pip install torch torchvision torchaudio"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

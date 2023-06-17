@@ -4,3 +4,4 @@ runs
 .DS_Store
 datasets/*
 *.json
+*.lock
