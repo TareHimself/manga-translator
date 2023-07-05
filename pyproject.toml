@@ -17,6 +17,7 @@ manga-ocr = "^0.1.10"
 largestinteriorrectangle = "^0.2.0"
 
 [tool.poe.tasks]
+uninstall-torch = "pip uninstall torch torchvision torchaudio"
 torch-win = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
 torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
 torch-mac ="pip install torch torchvision torchaudio"

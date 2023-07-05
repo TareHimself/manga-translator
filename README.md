@@ -40,7 +40,10 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 ```
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
-python -m pip install -r requirements.txt
+install poetry https://python-poetry.org/
+poetry install
+poe uninstall-torch
+poe torch-(operating system i.e. win | linux | mac)
 Download models and place them in the models folder 
 python main.py -m [live|convert -f "files"]
 ```
