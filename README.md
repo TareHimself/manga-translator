@@ -38,6 +38,7 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 ## Run
 
 ```
+setup conda https://conda.io/projects/conda/en/latest/user-guide/install/index.html
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
 install poetry https://python-poetry.org/
