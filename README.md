@@ -44,7 +44,7 @@ install poetry https://python-poetry.org/
 poetry install
 poe uninstall-torch
 poe torch-(operating system i.e. win | linux | mac)
-Download models and place them in the models folder 
+Download models to models/modelname 
 python main.py -m [live|convert -f "files"]
 ```
 
