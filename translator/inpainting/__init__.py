@@ -38,7 +38,7 @@ def inpaint(
     image: Image,
     mask: Image,
     model_path: str = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "trained", "states_pt_places2.pth"
+        os.path.dirname(os.path.realpath(__file__)), "../","../","models", "inpainting.pth"
     ),
 ) -> Image:
     generator = get_model(model_path)

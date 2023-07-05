@@ -31,13 +31,17 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [ ] Free text ocr
 - [ ] Free text translation
 - [ ] Improve text resize algorithm, some texts are too small/big
-
+## Models
+- [Detection](https://pixeldrain.com/u/si7YieRh)
+- [Segmentation](https://pixeldrain.com/u/675HkiHx)
+- [Inpainting](https://pixeldrain.com/u/Qxnfugrj)
 ## Run
 
 ```
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
 python -m pip install -r requirements.txt
+Download models and place them in the models folder 
 python main.py -m [live|convert -f "files"]
 ```
 

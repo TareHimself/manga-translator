@@ -5,3 +5,5 @@ runs
 datasets/*
 *.json
 *.lock
+*.pt
+*.pth
