@@ -41,7 +41,7 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
 python -m pip install -r requirements.txt
-Download models and place them in the models folder 
+Download models to models/modelname 
 python main.py -m [live|convert -f "files"]
 ```
 
