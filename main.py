@@ -170,7 +170,6 @@ def main():
 
     args = parser.parse_args()
 
-    print(args)
     if args.mode is None:
         parser.print_help()
     else:

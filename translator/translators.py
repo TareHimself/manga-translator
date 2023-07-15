@@ -6,13 +6,13 @@ from transformers import pipeline
 from requests.utils import requote_uri
 from translator.utils import cv2_to_pil
 from translator.ocr import BaseOcr, OcrResult
+from translator.plugin import BasePlugin, PluginArgument
 
-
-class Translator:
+class Translator(BasePlugin):
     """Base Class for all Translator classes"""
 
     def __init__(self) -> None:
-        pass
+        super().__init__()
 
     def __call__(self, ocr: BaseOcr, text: numpy.ndarray) -> str:
         return self.translate(self.apply_ocr(ocr, text))
@@ -22,6 +22,11 @@ class Translator:
 
     def translate(self, ocr_result: OcrResult) -> str:
         return ocr_result.text
+    
+    def get_name() -> str:
+        return "Base Translator"
+    
+    
 
 
 class DeepLTranslator(Translator):
@@ -30,6 +35,10 @@ class DeepLTranslator(Translator):
     def __init__(self, auth_token=None) -> None:
         super().__init__()
         self.auth_token = auth_token
+
+
+    def get_arguments() -> list[PluginArgument]:
+        return [PluginArgument(name="auth_token",description="DeepL Api Auth Token",required=True)]
 
     def translate(self, ocr_result: OcrResult):
         if self.auth_token is None:
@@ -41,6 +50,7 @@ class DeepLTranslator(Translator):
                 data.append(("text", ocr_result.text))
                 uri = f"https://api-free.deepl.com/v2/translate?{'&'.join([f'{data[i][0]}={data[i][1]}' for i in range(len(data))])}"
                 uri = requote_uri(uri)
+                
                 return requests.post(
                     uri,
                     headers={
@@ -53,6 +63,11 @@ class DeepLTranslator(Translator):
                 return "Failed To Get Translation"
         else:
             return ocr_result.text
+        
+    def get_name() -> str:
+        return "DeepL Translator"
+        
+    
 
 
 class GoogleTranslateTranslator(Translator):
@@ -69,6 +84,12 @@ class GoogleTranslateTranslator(Translator):
         return self.trans.translate(
             ocr_result.text, source_language=ocr_result.language, target_language="en"
         )["translatedText"]
+    
+    def get_arguments() -> list[PluginArgument]:
+        return [PluginArgument(name="service_account_key_path",description="Path to google application credentials",required=True)]
+    
+    def get_name() -> str:
+        return "Google Cloud Translate"
 
 
 class HelsinkiNlpJapaneseToEnglish(Translator):
@@ -83,9 +104,12 @@ class HelsinkiNlpJapaneseToEnglish(Translator):
             return self.pipeline(ocr_result.text)[0]["translation_text"]
 
         return super().translate(ocr_result)
+    
+    def get_name() -> str:
+        return "Helsinki NLP Japanese To English"
 
 
-def get_translators():
+def get_translators() -> list[Translator]:
     return [
         Translator,
         DeepLTranslator,

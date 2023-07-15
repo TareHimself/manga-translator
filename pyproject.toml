@@ -7,7 +7,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-poethepoet = "^0.20.0"
 ultralytics = "^8.0.118"
 pillow = "^9.5.0"
 pyhyphen = "^4.0.3"
@@ -15,12 +14,23 @@ google-cloud-translate = "^3.11.1"
 mss = "^9.0.1"
 manga-ocr = "^0.1.10"
 largestinteriorrectangle = "^0.2.0"
+sentencepiece = "^0.1.99"
+django = "^4.2.3"
+flask = "^2.3.2"
+tornado = "^6.3.2"
+
+[tool.poetry.dev-dependencies]
+poethepoet = "^0.20.0"
 
 [tool.poe.tasks]
-uninstall-torch = "pip uninstall torch torchvision torchaudio"
-torch-win = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
-torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
-torch-mac ="pip install torch torchvision torchaudio"
+uninstall-torch = "pip uninstall -y torch torchvision torchaudio"
+install-torch-cuda = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+# install-torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+# install-torch-osx ="pip install torch torchvision torchaudio"
+# torch-win = ["uninstall-torch","install-torch-win"]
+# torch-linux = ["uninstall-torch","install-torch-linux"]
+# torch-osx =["uninstall-torch","install-torch-osx"]
+force-cuda = ["uninstall-torch","install-torch-cuda"]
 
 [build-system]
 requires = ["poetry-core"]

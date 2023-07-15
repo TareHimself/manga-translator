@@ -8,8 +8,9 @@ import math
 from hyphen import Hyphenator
 from hyphen.textwrap2 import wrap
 import shutil
+import threading
 from tqdm import tqdm
-from .inpainting import inpaint
+from .inpainting import inpaint_threadsafe
 from collections import deque
 
 en_hyphenator = Hyphenator("en_US")
@@ -71,7 +72,7 @@ def clean_text(frame, frame_mask):
     #     np.full(cleaned.shape, 255, dtype=cleaned.dtype),
     #     frame_mask,
     # )
-    cleaned = pil_to_cv2(inpaint(cv2_to_pil(frame), cv2_to_pil(frame_mask)))
+    cleaned = pil_to_cv2(inpaint_threadsafe(cv2_to_pil(frame), cv2_to_pil(frame_mask)))
     text = do_mask(text, np.full(text.shape, 255, dtype=text.dtype), frame_mask, True)
     return text, cleaned
 
@@ -151,7 +152,11 @@ def cv2_to_pil(img) -> Image:
 
 def pil_to_cv2(img) -> np.ndarray:
     arr = np.array(img)
-    if arr.shape[2] == 4:
+
+    if len(arr.shape) == 2:
+        return cv2.cvtColor(np.array(img), cv2.COLOR_GRAY2BGR)
+    
+    if len(arr.shape) > 2 and arr.shape[2] == 4:
         return cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGR)
 
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
@@ -230,7 +235,101 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
         # a2[0] -= midpoint_x
 
         return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
+    
+def simplify_points(points):
+    # Convert the points to a NumPy array
+    points_array = np.array(points)
+    
+    # Find the convex hull of the points
+    hull = cv2.convexHull(points_array)
+    
+    # Convert the convex hull back to a list of points
+    simplified_points = np.array([np.array(x) for x in hull.squeeze().tolist()])
+    
+    return simplified_points
 
+# def mask_charactetrs(frame: np.ndarray):
+
+#     sample = frame.copy()
+
+#     mser = cv2.MSER_create()
+    
+#     initial_size = (sample.shape[1], sample.shape[0])
+#     scale_amt = max(30000 / (initial_size[0] * initial_size[1]),4)
+
+#     sample = cv2.resize(sample, (int(sample.shape[1]*scale_amt), int(sample.shape[0]*scale_amt)))
+
+#     final = np.zeros_like(sample,dtype=np.uint8)
+
+#     grey_sample = cv2.cvtColor(sample,cv2.COLOR_BGR2GRAY)
+
+#     regions,_ = mser.detectRegions(grey_sample)
+    
+#     sample_area = initial_size[0] * initial_size[1]
+
+#     # debug_image(sample,"CURRENT SPECIMEN")
+#     regions = list(filter(lambda a: (cv2.contourArea(a) / sample_area) < 0.6,regions))
+#     # regions = [simplify_points(x) for x in regions]
+#     # cv2.polylines(final, [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions], True, (0,255,0)) 
+#     # cv2.drawContours(final, regions, -1, color=(255, 255, 255), thickness=cv2.FILLED)
+
+#     cv2.polylines(final, regions,1,(255,255,255),5)
+
+#     result = cv2.resize(final,initial_size)
+#     # dilation_ammount = 4
+#     # kernel = np.ones((dilation_ammount,dilation_ammount),np.uint8)
+#     # img_e = cv2.dilate(cv2.resize(final,initial_size),kernel,iterations = 1)
+#     return result
+
+def mask_charactetrs(frame: np.ndarray):
+    # debug_image(frame,"Data")
+    image = frame.copy()
+
+    # Convert the image to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply adaptive thresholding to the grayscale image
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 5)
+
+    # Perform morphological operations to improve the text extraction
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+
+    # Find contours of the characters
+    contours, _ = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Create a blank mask image
+    mask = np.zeros_like(image)
+
+    # Draw contours on the mask
+    for contour in contours:
+        # Filter out small contours and contours with a large aspect ratio
+        (x, y, w, h) = cv2.boundingRect(contour)
+        cv2.drawContours(mask, [contour], -1, (255, 255, 255), thickness=cv2.FILLED)
+            
+    dilation_ammount = 4
+    kernel = np.ones((dilation_ammount,dilation_ammount),np.uint8)
+    mask = cv2.dilate(mask,kernel,iterations = 1)
+
+    # debug_image(mask,"BETWEEN")
+    # # Find contours of the characters
+    # contours, heiriachy = cv2.findContours(cv2.threshold(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY),125,255,0)[1], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    # # Create a blank mask image
+    # mask = np.zeros_like(image)
+
+    # # Draw contours on the mask
+    # for contour,info in zip(contours,heiriachy[0]):
+    #     # Filter out small contours and contours with a large aspect ratio
+    #     (x, y, w, h) = cv2.boundingRect(contour)
+    #     cv2.drawContours(mask, [contour], -1, (255, 255, 255), thickness=cv2.FILLED)
+    #     # if info[2] == -1:
+    #     #     cv2.drawContours(mask, [contour], -1, (255, 255, 255), thickness=1)#cv2.FILLED)
+
+    return mask
+
+
+inpainting_lock = threading.Lock()
 
 def inpaint_optimized(
     frame: np.ndarray,
@@ -238,119 +337,103 @@ def inpaint_optimized(
     filtered: list,
     max_height=256,
     max_width=256,
-    method=0,
 ):
     h, w, c = frame.shape
+    max_height = int(math.floor(max_height / 8) * 8)
+    max_width = int(math.floor(max_width / 8) * 8)
+    
+    # only inpaint sections with masks and isolate said masks
+    final = frame.copy()
+    text_mask = frame.copy()
 
-    if method == 0:
-        # only inpaint sections with masks and isolate said masks
-        final = frame.copy()
+    half_height = int(max_height / 2)
+    half_width = int(max_width / 2)
 
-        half_height = int(max_height / 2)
-        half_width = int(max_width / 2)
+    for bbox, cls, conf in filtered:
+        bx1, by1, bx2, by2 = bbox
+        bx1, by1, bx2, by2 = round(bx1), round(by1), round(bx2), round(by2)
 
-        for bbox, cls, conf in filtered:
-            bx1, by1, bx2, by2 = bbox
-            bx1, by1, bx2, by2 = round(bx1), round(by1), round(bx2), round(by2)
+        half_bx = round((bx2 - bx1) / 2)
+        half_by = round((by2 - by1) / 2)
+        midpoint_x, midpoint_y = round(bx1 + (half_bx)), round(by1 + (half_by))
 
-            half_bx = round((bx2 - bx1) / 2)
-            half_by = round((by2 - by1) / 2)
-            midpoint_x, midpoint_y = round(bx1 + (half_bx)), round(by1 + (half_by))
+        x1, y1 = max(0, midpoint_x - half_width), max(0, midpoint_y - half_height)
 
-            x1, y1 = max(0, midpoint_x - half_width), max(0, midpoint_y - half_height)
+        x2, y2 = min(w, midpoint_x + half_width), min(h, midpoint_y + half_height)
 
-            x2, y2 = min(w, midpoint_x + half_width), min(h, midpoint_y + half_height)
+        if y2 < by2:
+            y2 = by2
 
-            if y2 < by2:
-                y2 = by2
+        if y1 > by1:
+            y1 = by1
 
-            if y1 > by1:
-                y1 = by1
+        if x2 < bx2:
+            x2 = bx2
 
-            if x2 < bx2:
-                x2 = bx2
+        if x1 > bx1:
+            x1 = bx1
 
-            if x1 > bx1:
-                x1 = bx1
+        overflow_x = (x2 - x1) % 8
+        x1_adjust = 0
+        if overflow_x != 0:
+            if x2 > x1:
+                x2 -= overflow_x
+            else:
+                x1 += overflow_x
+                x1_adjust = overflow_x
 
-            overflow_x = (x2 - x1) % 8
-            x1_adjust = 0
-            if overflow_x != 0:
-                if x2 > x1:
-                    x2 -= overflow_x
-                else:
-                    x1 += overflow_x
-                    x1_adjust = overflow_x
+        overflow_y = (y2 - y1) % 8
 
-            overflow_y = (y2 - y1) % 8
+        y1_adjust = 0
+        if overflow_y != 0:
+            if y2 > y1:
+                y2 -= overflow_y
+            else:
+                y1 += overflow_y
+                y1_adjust = overflow_y
 
-            y1_adjust = 0
-            if overflow_y != 0:
-                if y2 > y1:
-                    y2 -= overflow_y
-                else:
-                    y1 += overflow_y
-                    y1_adjust = overflow_y
+        bx1 = bx1 - (x1 + x1_adjust)
+        bx2 = bx2 - (x1 + x1_adjust)
+        by1 = by1 - (y1 + y1_adjust)
+        by2 = by2 - (y1 + y1_adjust)
 
-            bx1 = bx1 - (x1 + x1_adjust)
-            bx2 = bx2 - (x1 + x1_adjust)
-            by1 = by1 - (y1 + y1_adjust)
-            by2 = by2 - (y1 + y1_adjust)
+        region_mask = mask[y1:y2, x1:x2].copy()
+        focus_mask = cv2.rectangle(
+            np.zeros_like(region_mask),
+            (bx1, by1),
+            (bx2, by2),
+            (255, 255, 255),
+            -1,
+        )
 
-            region_mask = mask[y1:y2, x1:x2].copy()
-            focus_mask = cv2.rectangle(
-                np.zeros_like(region_mask),
-                (bx1, by1),
-                (bx2, by2),
-                (255, 255, 255),
-                -1,
+        region_mask = do_mask(
+            region_mask, np.zeros_like(region_mask), focus_mask, True
+        )
+
+        # debug_image(region_mask,"Current Region Mask")
+
+        # debug_image(final[y1:y2, x1:x2],"Current Region Image")
+
+        if has_white(region_mask):
+            
+            section = final[y1:y2, x1:x2]
+            # debug_image(section,"Target")
+            # debug_image(region_mask,"Initial Mask")
+            refined_mask = mask_charactetrs(do_mask(section,np.ones_like(region_mask) * 255,region_mask,True))
+            # debug_image(refined_mask,"Refined mask")
+            final[y1:y2, x1:x2] = pil_to_cv2(
+                inpaint_threadsafe(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(refined_mask))
             )
-            region_mask = do_mask(
-                region_mask, np.zeros_like(region_mask), focus_mask, True
-            )
 
-            if has_white(region_mask):
-                final[y1:y2, x1:x2] = pil_to_cv2(
-                    inpaint(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(region_mask))
-                )
+            text_mask[y1:y2, x1:x2] = refined_mask
 
-        return final
-    elif method == 1:
-        # divide the image into a grid and inpaint each part if it has a mask in it
-        final = np.zeros_like(frame)
-        if h > max_height or w > max_width:
-            divisions_y = math.ceil(h / max_height)
-            divisions_x = math.ceil(w / max_width)
+            # final[y1:y2, x1:x2] = do_mask(final[y1:y2, x1:x2],np.ones_like(final[y1:y2, x1:x2]) * 255,refined_mask,False)
 
-            indices_y = []
-            indices_x = []
-            for i in range(divisions_y):
-                if i == divisions_y - 1:
-                    indices_y.append((h - max_height, h))
-                else:
-                    indices_y.append((max_height * i, max_height * (i + 1)))
+            # final[y1:y2, x1:x2] = pil_to_cv2(
+            #     inpaint(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(region_mask))
+            # )
 
-            for i in range(divisions_x):
-                if i == divisions_x - 1:
-                    indices_x.append((w - max_width, w))
-                else:
-                    indices_x.append((max_width * i, max_width * (i + 1)))
-
-            for y_coord in indices_y:
-                for x_coord in indices_x:
-                    y1, y2 = y_coord
-                    x1, x2 = x_coord
-                    mask_region = mask[y1:y2, x1:x2]
-                    frame_region = frame[y1:y2, x1:x2]
-                    if has_white(mask_region):
-                        final[y1:y2, x1:x2] = pil_to_cv2(
-                            inpaint(cv2_to_pil(frame_region), cv2_to_pil(mask_region))
-                        )
-                    else:
-                        final[y1:y2, x1:x2] = frame_region
-            return final
-    else:
-        return frame
+    return final,text_mask
 
 
 def pixels_to_pt(pixels):
