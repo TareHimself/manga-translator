@@ -1,19 +1,21 @@
 import translator.inpainting # must be first import to handle exits
+import os
 import io
 import urllib.parse
 import requests
 import cv2
 import numpy as np
 import asyncio
-from tornado.web import RequestHandler, Application
+from tornado.web import RequestHandler, Application,StaticFileHandler
 from threading import Thread
-from translator.utils import cv2_to_pil, pil_to_cv2
+from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts,get_font_path_at_index
 from translator.pipelines import FullConversion
 from translator.translators import get_translators
 from translator.ocr import get_ocr,CleanOcr
 from PIL import Image
 import json
 import re
+import webbrowser
 import traceback
 
 def run_in_thread(func):
@@ -65,31 +67,11 @@ def cv2_image_from_url(url: str):
         return pil_to_cv2(Image.open(io.BytesIO(requests.get(url).content)))
     else:
         
-        data = cv2.imread(urllib.parse.unquote(url))
+        data = cv2.imread(urllib.parse.unquote(url.split("?")[0]))
+        
         if data is None:
             raise BaseException(f"Failed to load image from path {url}")
         return data
-    
-class CleanFromWebHandler(RequestHandler):
-    @run_in_thread
-    def get(self):
-        try:
-            full_url = self.request.full_url()
-        
-            target_url = full_url[full_url.index("/clean/") + len("/clean/"):]
-            
-            image_cv2 = cv2_image_from_url(target_url)
-            result = clean_image(image_cv2)
-            converted_pil = cv2_to_pil(result)
-            img_byte_arr = io.BytesIO()
-            converted_pil.save(img_byte_arr, format="PNG")
-            # Create response given the bytes
-            self.set_header("Content-Type", "image/png")
-            self.write(img_byte_arr.getvalue())
-        except:
-            self.set_status(500)
-            self.write(traceback.format_exc())
-        
 
 REQUEST_SECTION_REGEX = r"id=([0-9]+)(.*)"
 REQUEST_SECTION_PARAMS_REGEX = r"\$([a-z0-9_]+)=([^\/$]+)"
@@ -103,22 +85,64 @@ def extract_params(data: str) -> tuple[str,dict]:
             params[param_name] = param_value
 
     return  int(selected_id), params
+
+def send_file_in_chunks(request: RequestHandler,file_path):
+    with open(file_path, 'rb') as f:
+            while True:
+                data = f.read(16384) # or some other nice-sized chunk
+                if not data: break
+                request.write(data)
+
+class CleanFromWebHandler(RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'image/png')
+
+    @run_in_thread
+    def get(self):
+        try:
+            full_url = self.request.full_url()
+        
+            target_url = full_url[full_url.index("/clean/") + len("/clean/"):]
+            
+            image_cv2 = cv2_image_from_url(target_url)
+            result = clean_image(image_cv2)
+            converted_pil = cv2_to_pil(result)
+            img_byte_arr = io.BytesIO()
+            converted_pil.save(img_byte_arr, format="PNG")
+            # Create response given the bytes
+            self.write(img_byte_arr.getvalue())
+        except:
+            self.set_header("Content-Type", 'text/html')
+            self.set_status(500)
+            self.write(traceback.format_exc())
      
 class TranslateFromWebHandler(RequestHandler):
+
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'image/png')
+
     @run_in_thread
-    def get(self,translator_info,ocr_info):
+    def get(self,translator_info,ocr_info,font_info):
         try:
             full_url = self.request.full_url()
             
-            target_url = "/".join(full_url.split("/")[6:])
+            target_url = "/".join(full_url.split("/")[7:])
 
             translator_id,translator_params = extract_params(translator_info)
-
+            
             ocr_id,ocr_params = extract_params(ocr_info)
+
+            font_id,_ = extract_params(font_info)
 
             image_cv2 = cv2_image_from_url(target_url)
 
-            converter = FullConversion(translator=get_translators()[translator_id](**translator_params),ocr=get_ocr()[ocr_id](**ocr_params))
+            converter = FullConversion(translator=get_translators()[translator_id](**translator_params),ocr=get_ocr()[ocr_id](**ocr_params),font_file=get_font_path_at_index(font_id))
 
             result = converter([image_cv2])[0]
 
@@ -126,16 +150,53 @@ class TranslateFromWebHandler(RequestHandler):
             img_byte_arr = io.BytesIO()
             converted_pil.save(img_byte_arr, format="PNG")
             # Create response given the bytes
-            self.set_header("Content-Type", "image/png")
             self.write(img_byte_arr.getvalue())
         except:
+            self.set_header("Content-Type", 'text/html')
             self.set_status(500)
             self.write(traceback.format_exc())
-          
-class BaseHandler(RequestHandler):
+            traceback.print_exc()
+
+class ImageHandler(RequestHandler):
+
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'image/*')
+
+    @run_in_thread
     def get(self):
         try:
-            data = { "translators": [], "ocr": []}
+            full_url = self.request.full_url()
+
+
+            item_path = "/".join(full_url.split("/")[4:])
+
+            if item_path.startswith("http"):
+                self.write(requests.get(item_path).content)
+            else:   
+                if not os.path.exists(item_path):
+                    self.set_status(404)
+                else:
+                    send_file_in_chunks(self,item_path)
+        except:
+            self.set_header("Content-Type", 'text/html')
+            self.set_status(500)
+            self.write(traceback.format_exc())
+            traceback.print_exc()
+
+class BaseHandler(RequestHandler):
+
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'application/json')
+
+    def get(self):
+        try:
+            data = { "translators": [], "ocr": [], "fonts": get_fonts()}
 
             translators = get_translators()
 
@@ -156,21 +217,45 @@ class BaseHandler(RequestHandler):
                 "description": ocr[x].__doc__,
                 "args": [x.get() for x in ocr[x].get_arguments()]
                 })
-
-            self.set_header("Content-Type", 'application/json')
             self.write(json.dumps(data))
         except:
+            self.set_header("Content-Type", 'text/html')
             self.set_status(500)
             self.write(traceback.format_exc())
+            traceback.print_exc()
 
+class UiFilesHandler(RequestHandler):
+
+    def initialize(self,build_path) -> None:
+        self.build_path = build_path
+
+    @run_in_thread
+    def get(self,target_file):
+        send_file_in_chunks(self,os.path.join(self.build_path,target_file))
+
+class UiHandler(RequestHandler):
+    def get(self):
+        self.render("index.html")
+        
 async def main():
+        app_port = 5000
+        build_path = os.path.join(os.path.dirname(__file__), "build")
+        settings = {
+            "template_path": build_path,
+            "static_path": os.path.join(build_path,'static'),
+        }
         app = Application([
+            (r"/",UiHandler),
             (r"/info", BaseHandler),
             (r"/clean/.*",CleanFromWebHandler),
-            (r"/translate/(id=[^\/]*)/(id=[^\/]*)/.*",TranslateFromWebHandler)
-            ])
-        app.listen(5000)
+            (r"/translate/(id=[^\/]*)/(id=[^\/]*)/(id=[^\/]*)/.*",TranslateFromWebHandler),
+            (r"/images/.*", ImageHandler),
+            (r"/(.*)",UiFilesHandler,dict(build_path = build_path)),
+            ],**settings)
+        app.listen(app_port)
+        webbrowser.open(f'http://localhost:{app_port}')
         await asyncio.Event().wait()
+        
 
 
 asyncio.run(main())

@@ -25,12 +25,16 @@ poethepoet = "^0.20.0"
 [tool.poe.tasks]
 uninstall-torch = "pip uninstall -y torch torchvision torchaudio"
 install-torch-cuda = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+build-ui = "npm install && npm run build"
+run-server = "python server.py"
+force-cuda = ["uninstall-torch","install-torch-cuda"]
 # install-torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
 # install-torch-osx ="pip install torch torchvision torchaudio"
 # torch-win = ["uninstall-torch","install-torch-win"]
 # torch-linux = ["uninstall-torch","install-torch-linux"]
 # torch-osx =["uninstall-torch","install-torch-osx"]
-force-cuda = ["uninstall-torch","install-torch-cuda"]
+
+
 
 [build-system]
 requires = ["poetry-core"]

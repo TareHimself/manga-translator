@@ -1,0 +1,164 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #222;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  display: flex;
+  width: 100vw;
+  min-height: 100vh;
+  height: 100vh;
+}
+
+.app {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.tile {
+  display: flex;
+  position: relative;
+  flex: 1 1;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 30px;
+  overflow-y: scroll;
+}
+
+.tile[data-fit="page"] {
+  overflow-y: hidden;
+}
+
+@keyframes load_pending {
+  from {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* width */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background-color: white;
+  border-radius: 10px;
+}
+
+.tile .loading {
+  animation: 1s infinite linear load_pending;
+}
+
+.tile img {
+  position: absolute;
+  width: 70%;
+  transition: all ease-in-out 0.2s;
+}
+
+.tile[data-fit="page"] img {
+  width: 70%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* .tile img {
+  object-fit: contain;
+} */
+
+.converted:hover {
+  opacity: 0;
+}
+
+.tile-row {
+  display: flex;
+  width: 80%;
+  height: -moz-fit-content;
+  height: fit-content;
+  gap: 10px;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.tile-row label {
+  color: white;
+  margin: 0px;
+  font-size: 15px;
+}
+
+.tile-row-content {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  gap: 20px;
+
+}
+
+.tile-row-content input[type="text"] {
+  height: 100%;
+  width: 60%;
+  padding: 0px 5px;
+  border: 0px;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.tile-row svg {
+  font-size: 28px;
+  transition: all ease-in-out 0.2s;
+  cursor: pointer;
+}
+
+.tile-row svg:hover {
+  transform: scale(1.1);
+}
+
+.tile-row-content select {
+  height: 100%;
+  width: 60%;
+  border-radius: 5px;
+}
+
+.tile-row-content button {
+  margin-top: 40px;
+  cursor: pointer;
+  height: 100%;
+  width: 60%;
+  border-radius: 5px;
+  transition: all ease-in-out 0.2s;
+}
+
+.tile-row-content button:hover {
+  border-radius: 20px;
+}

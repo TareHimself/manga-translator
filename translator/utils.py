@@ -519,6 +519,21 @@ def wrap_text(text: str, max_chars: int):
 # [print(x, en_hyphenator.pairs(x)) for x in text.split(" ")]
 # return wrap(text, max_chars, use_hyphenator=en_hyphenator)
 
+def get_fonts():
+    fonts = []
+    idx = 0
+    for file in filter(lambda a: a.endswith('.ttf'),os.listdir("./fonts")):
+        fonts.append({
+            "id": idx,
+            "name": file[0:-4]
+        })
+
+        idx += 1
+    
+    return fonts
+
+def get_font_path_at_index(idx: int):
+    return os.path.join("./fonts",list(filter(lambda a: a.endswith('.ttf'),os.listdir("./fonts")))[idx])
 
 def get_average_font_size(font, text="some text here"):
     x, y, w, h = font.getbbox(text)
@@ -597,7 +612,8 @@ def get_best_font_size(
 def draw_text_in_bubble(
     frame,
     bounds,
-    text="Sample",
+    text="",
+    font_file="fonts/animeace2_reg.ttf"
 ):
     pt1, pt2 = bounds
 
@@ -612,7 +628,7 @@ def draw_text_in_bubble(
     font_size, chars_per_line, line_height, iters = get_best_font_size(
         text,
         (max_width, max_height),
-        "fonts/BlambotClassicBB.ttf",
+        font_file,
         space_between_lines,
         30,
         1,
@@ -640,6 +656,7 @@ def draw_text_in_bubble(
     draw_y = pt1[1]
 
     wrapped = wrap_text(text, chars_per_line)
+    
     for line_no in range(len(wrapped)):
         line = wrapped[line_no]
         x, y, w, h = font.getbbox(line)

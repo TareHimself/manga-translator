@@ -3,13 +3,13 @@ from translator.utils import cv2_to_pil
 from translator.plugin import BasePlugin
 
 class OcrResult:
-    def __init__(self, text: str = "Sample", language: str = "en") -> None:
+    def __init__(self, text: str = "", language: str = "en") -> None:
         self.text = text
         self.language = language
 
 
 class BaseOcr(BasePlugin):
-    """Base Class for all OCR classes"""
+    """Always outputs \"Sample\""""
 
     def __init__(self) -> None:
         super().__init__()
@@ -18,10 +18,10 @@ class BaseOcr(BasePlugin):
         return self.do_ocr(text)
 
     def do_ocr(self, text: numpy.ndarray):
-        return OcrResult()
+        return OcrResult("Sample")
     
     def get_name() -> str:
-        return "Base Ocr (Does Nothing)"
+        return "Base Ocr"
     
 class CleanOcr(BaseOcr):
     """Cleans The Image i.e. does nothing"""
