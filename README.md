@@ -1,8 +1,14 @@
 # Manga Translator
 
+<img src="examples/ui_example.png"/>
+
 ## Why ?
 
-A long, long, long time ago, a wee lad was reading a manga. It was such a blissfull read for this wee lad before he realized and before he realized it he had reached the last page.Curious on the next release this lad hoped on the web to find answers only to that the manga was no longer being translated. Stricken by grief this wee lad set out to right this wrong.
+- Boy read manga.
+- Boy reach latest chapter.
+- Chapter not translated.
+- Boy get mad.
+- Boy do code instead of waiting like a normal person.
 
 ## How ?
 
@@ -31,21 +37,42 @@ A long, long, long time ago, a wee lad was reading a manga. It was such a blissf
 - [ ] Free text ocr
 - [ ] Free text translation
 - [ ] Improve text resize algorithm, some texts are too small/big
+
 ## Models
+
 - [Detection](https://pixeldrain.com/u/hjjU79dU)
 - [Segmentation](https://pixeldrain.com/u/675HkiHx)
 - [Inpainting](https://pixeldrain.com/u/Qxnfugrj)
-## Run
 
-```
-setup conda https://conda.io/projects/conda/en/latest/user-guide/install/index.html
+## Install
+
+- setup [Anaconda](https://www.anaconda.com/download)
+- clone this repository
+- Open a terimal in the cloned repository
+- Run the following in the terminal to create an enviroment
+```py
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
-install poetry https://python-poetry.org/
+```
+- Install [Poetry](https://python-poetry.org/)
+- Run the following in the enviroment we created
+
+```bash
 poetry install
-poe uninstall-torch
-poe torch-(operating system i.e. win | linux | mac)
-Download models to models/modelname 
+# For cuda support run "poe force-cuda"
+```
+- Download models to models/modelname (i.e. models/detection.py)
+- If you plan to use the UI also install [NodeJS](https://nodejs.org/en)
+
+## Run
+### UI
+```bash
+poe build-ui
+poe run-server
+```
+
+### CLI
+```bash
 python main.py -m [live|convert -f "files"]
 ```
 
@@ -65,11 +92,11 @@ python main.py -m [live|convert -f "files"]
 
 ## Examples
 
-<img src="ja_a_certain_scientific_accelerator_1_001.png" width="500"/><img src="ja_a_certain_scientific_accelerator_1_001_converted.png" width="500"/>
+<img src="examples/ja_a_certain_scientific_accelerator_1_001.png" width="500"/><img src="examples/ja_a_certain_scientific_accelerator_1_001_converted.png" width="500"/>
 
-<img src="ja_one_punch_man_194.jpg" width="500"/><img src="ja_one_punch_man_194_converted.jpg" width="500"/>
+<img src="examples/ja_one_punch_man_194.jpg" width="500"/><img src="examples/ja_one_punch_man_194_converted.jpg" width="500"/>
 
-<img src="ja_oshi_no_ko_1_004.png" width="500"/><img src="ja_oshi_no_ko_1_004_converted.png" width="500"/>
+<img src="examples/ja_oshi_no_ko_1_004.png" width="500"/><img src="examples/ja_oshi_no_ko_1_004_converted.png" width="500"/>
 
 ## Glossary
 

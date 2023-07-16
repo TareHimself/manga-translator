@@ -11,7 +11,8 @@ from translator.utils import (
     inpaint_optimized,
     debug_image
 )
-import concurrent.futures
+import torch
+import concurrent
 from translator.translators import Translator
 from translator.ocr import BaseOcr
 
@@ -42,6 +43,7 @@ class FullConversion:
         seg_model="models/segmentation.pt",
         translator=Translator(),
         ocr=BaseOcr(),
+        font_file="fonts/animeace2_reg.ttf",
         debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
@@ -49,6 +51,7 @@ class FullConversion:
         self.translator = translator
         self.ocr = ocr
         self.debug = debug
+        self.font_file = font_file
 
     def filter_results(self, results, min_confidence=0.1):
         bounding_boxes = np.array(results.boxes.xyxy.cpu(), dtype="int")
@@ -193,7 +196,7 @@ class FullConversion:
         #                     fix_result[0][0] - bbox_a[0],
         #                     fix_result[0][1] - bbox_a[1],
         #                 ],
-        #                 [
+        #                 [torch.cuda.is_available()
         #                     fix_result[1][0] - bbox_a[0],
         #                     fix_result[1][1] - bbox_a[1],
         #                 ],
@@ -243,15 +246,15 @@ class FullConversion:
                 translation = self.translator(self.ocr, text_as_image)
                 if len(translation.strip()):
                     frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                        bubble, text_bounds, translation
+                        bubble, text_bounds, translation,font_file=self.font_file
                     )
             else:
-                frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, text_bounds)
+                frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, text_bounds,font_file=self.font_file)
 
-        print("Done with frame")
+        
         return frame
     
-    def __call__(self, images: list[np.ndarray],yolo_device = 0 if sys.platform != "darwin" else "mps") -> list[np.ndarray]:
+    def __call__(self, images: list[np.ndarray],yolo_device = 0 if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "mps" if sys.platform != "darwin" else torch.device('cpu')) -> list[np.ndarray]:
         # frames = [resize_percent(x, 50) for x in frames]
         to_process = [x for x in zip(
             self.detection_model(images, device=yolo_device, verbose=False),self.segmentation_model(

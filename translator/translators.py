@@ -41,9 +41,9 @@ class DeepLTranslator(Translator):
         return [PluginArgument(name="auth_token",description="DeepL Api Auth Token",required=True)]
 
     def translate(self, ocr_result: OcrResult):
-        if self.auth_token is None:
+        if self.auth_token is None or len(self.auth_token.strip()) == 0:
             return "Need DeepL Auth"
-
+        
         if ocr_result.language == "ja":
             try:
                 data = [("target_lang", "EN-US"), ("source_lang", "JA")]

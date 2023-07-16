@@ -10,7 +10,7 @@ import sys
 
 # In this file we queue all inpainting requests so other aspects can run on multiple threads (could also do that here but I am assuming shit gpu)
 
-INPAINT_MODEL_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+INPAINT_MODEL_DEVICE = torch.device("cuda" if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "cpu")
 
 _inpaint_queue = queue.Queue()
 
@@ -28,7 +28,7 @@ def _inpaint_thread():
         if path == current_model_path:
             return current_model
         else:
-            generator_state_dict = torch.load(path)["G"]
+            generator_state_dict = torch.load(path,map_location=INPAINT_MODEL_DEVICE)["G"]
 
             if "stage1.conv1.conv.weight" in generator_state_dict.keys():
                 from .model.networks import Generator
@@ -104,7 +104,7 @@ def _inpaint_thread():
         callback(inpaint(pil_image,pil_mask,model_path))
         payload = _inpaint_queue.get()
 
-
+pending_tasks = []
 async def inpaint_async(image: Image,
         mask: Image,
         model_path: str = os.path.join(
@@ -120,8 +120,9 @@ async def inpaint_async(image: Image,
 
     _inpaint_queue.put((image,mask,model_path,callback))
 
+    pending_tasks.append(pending_task)
     result = await pending_task
-
+    pending_tasks.remove(pending_task)
     return result
 
 def inpaint_threadsafe(image: Image,
@@ -147,9 +148,18 @@ _og_exit = sys.exit
 
 def _new_sys_exit(*args,**kwargs):
     global _og_exit
-    _inpaint_queue.put(None)
-    _running_thread.join()
+    
+    try:
+        with _inpaint_queue.mutex:
+            _inpaint_queue.queue.clear()
+        for task in pending_tasks:
+            task.cancel()
+        _inpaint_queue.put(None)
+        _running_thread.join()
+    except:
+        pass
     _og_exit(*args,**kwargs)
+    
 
 sys.exit =  _new_sys_exit
     
