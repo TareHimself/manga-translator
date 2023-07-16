@@ -1,5 +1,5 @@
+import translator.inpainting # must be first import to handle exits
 import argparse
-import ast
 import cv2
 import sys
 import os
@@ -113,6 +113,7 @@ def main():
         prog="Manga Translator",
         description="Translates Manga Chapters",
         formatter_class=SmartFormatter,
+        exit_on_error=True
     )
 
     parser.add_argument(
@@ -170,7 +171,6 @@ def main():
 
     args = parser.parse_args()
 
-    print(args)
     if args.mode is None:
         parser.print_help()
     else:
