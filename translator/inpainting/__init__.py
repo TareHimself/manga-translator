@@ -12,11 +12,11 @@ import sys
 
 INPAINT_MODEL_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-inpaint_queue = queue.Queue()
+_inpaint_queue = queue.Queue()
 
 
-def inpaint_thread():
-    global inpaint_queue
+def _inpaint_thread():
+    global _inpaint_queue
 
     current_model = None
     current_model_path = ""
@@ -97,12 +97,12 @@ def inpaint_thread():
 
         return img_out
     
-    payload = inpaint_queue.get()
+    payload = _inpaint_queue.get()
 
     while payload is not None:
         pil_image,pil_mask,model_path,callback = payload
         callback(inpaint(pil_image,pil_mask,model_path))
-        payload = inpaint_queue.get()
+        payload = _inpaint_queue.get()
 
 
 async def inpaint_async(image: Image,
@@ -118,7 +118,7 @@ async def inpaint_async(image: Image,
         nonlocal loop
         loop.call_soon_threadsafe(pending_task.set_result,inpaint_result)
 
-    inpaint_queue.put((image,mask,model_path,callback))
+    _inpaint_queue.put((image,mask,model_path,callback))
 
     result = await pending_task
 
@@ -132,15 +132,24 @@ def inpaint_threadsafe(image: Image,
     return asyncio.run(inpaint_async(image,mask,model_path))
 
 
-running_thread = threading.Thread(target=inpaint_thread,group=None)
+_running_thread = threading.Thread(target=_inpaint_thread,group=None)
 
-def stop_inpaint_thread():
-    
-    inpaint_queue.put(None)
-    running_thread.join()
-    sys.exit(0)
+def _stop_inpaint_thread(signum, frame):
+    sys.exit(signum)
 
-signal.signal(signal.SIGINT, lambda a,b: stop_inpaint_thread())
+_running_thread.start()
 
-running_thread.start()
+signal.signal(signal.SIGINT,_stop_inpaint_thread)
+signal.signal(signal.SIGABRT, _stop_inpaint_thread)
+signal.signal(signal.SIGTERM, _stop_inpaint_thread)
+
+_og_exit = sys.exit
+
+def _new_sys_exit(*args,**kwargs):
+    global _og_exit
+    _inpaint_queue.put(None)
+    _running_thread.join()
+    _og_exit(*args,**kwargs)
+
+sys.exit =  _new_sys_exit
     

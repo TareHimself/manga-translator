@@ -1,4 +1,6 @@
+import translator.inpainting # must be first import to handle exits
 import io
+import urllib.parse
 import requests
 import cv2
 import numpy as np
@@ -58,21 +60,36 @@ def clean_image(image: np.ndarray):
 #     response.headers.set("Content-Type", "application/json")
 #     return response
 
+def cv2_image_from_url(url: str):
+    if url.startswith('http'):
+        return pil_to_cv2(Image.open(io.BytesIO(requests.get(url).content)))
+    else:
+        
+        data = cv2.imread(urllib.parse.unquote(url))
+        if data is None:
+            raise BaseException(f"Failed to load image from path {url}")
+        return data
+    
 class CleanFromWebHandler(RequestHandler):
     @run_in_thread
     def get(self):
-        full_url = self.request.full_url()
+        try:
+            full_url = self.request.full_url()
         
-        target_url = full_url[full_url.index("/clean/") + len("/clean/"):]
+            target_url = full_url[full_url.index("/clean/") + len("/clean/"):]
+            
+            image_cv2 = cv2_image_from_url(target_url)
+            result = clean_image(image_cv2)
+            converted_pil = cv2_to_pil(result)
+            img_byte_arr = io.BytesIO()
+            converted_pil.save(img_byte_arr, format="PNG")
+            # Create response given the bytes
+            self.set_header("Content-Type", "image/png")
+            self.write(img_byte_arr.getvalue())
+        except:
+            self.set_status(500)
+            self.write(traceback.format_exc())
         
-        image_cv2 = pil_to_cv2(Image.open(io.BytesIO(requests.get(target_url).content)))
-        result = clean_image(image_cv2)
-        converted_pil = cv2_to_pil(result)
-        img_byte_arr = io.BytesIO()
-        converted_pil.save(img_byte_arr, format="PNG")
-        # Create response given the bytes
-        self.set_header("Content-Type", "image/png")
-        self.write(img_byte_arr.getvalue())
 
 REQUEST_SECTION_REGEX = r"id=([0-9]+)(.*)"
 REQUEST_SECTION_PARAMS_REGEX = r"\$([a-z0-9_]+)=([^\/$]+)"
@@ -99,21 +116,21 @@ class TranslateFromWebHandler(RequestHandler):
 
             ocr_id,ocr_params = extract_params(ocr_info)
 
+            image_cv2 = cv2_image_from_url(target_url)
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),ocr=get_ocr()[ocr_id](**ocr_params))
 
-            image_cv2 = pil_to_cv2(Image.open(io.BytesIO(requests.get(target_url).content)))
             result = converter([image_cv2])[0]
+
             converted_pil = cv2_to_pil(result)
             img_byte_arr = io.BytesIO()
             converted_pil.save(img_byte_arr, format="PNG")
             # Create response given the bytes
             self.set_header("Content-Type", "image/png")
             self.write(img_byte_arr.getvalue())
-        except Exception as e:
-            traceback.print_exc()
+        except:
             self.set_status(500)
-            self.finish()
+            self.write(traceback.format_exc())
           
 class BaseHandler(RequestHandler):
     def get(self):
@@ -142,10 +159,9 @@ class BaseHandler(RequestHandler):
 
             self.set_header("Content-Type", 'application/json')
             self.write(json.dumps(data))
-        except Exception as e:
-            traceback.print_exc()
+        except:
             self.set_status(500)
-            self.finish()
+            self.write(traceback.format_exc())
 
 async def main():
         app = Application([

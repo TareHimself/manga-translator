@@ -281,7 +281,7 @@ def simplify_points(points):
 #     # img_e = cv2.dilate(cv2.resize(final,initial_size),kernel,iterations = 1)
 #     return result
 
-def mask_charactetrs(frame: np.ndarray):
+def mask_charactetrs(frame: np.ndarray,final_mask_dilation = 6):
     # debug_image(frame,"Data")
     image = frame.copy()
 
@@ -307,8 +307,7 @@ def mask_charactetrs(frame: np.ndarray):
         (x, y, w, h) = cv2.boundingRect(contour)
         cv2.drawContours(mask, [contour], -1, (255, 255, 255), thickness=cv2.FILLED)
             
-    dilation_ammount = 4
-    kernel = np.ones((dilation_ammount,dilation_ammount),np.uint8)
+    kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
     mask = cv2.dilate(mask,kernel,iterations = 1)
 
     # debug_image(mask,"BETWEEN")
