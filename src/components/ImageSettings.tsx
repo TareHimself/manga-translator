@@ -28,7 +28,7 @@ function toDefaultArgs(args: IServerArgument[]): IToServerArgument[] {
 }
 
 function argsToString(total: string, current: IToServerArgument) {
-  return total + "$" + current.name + "=" + current.value;
+  return total + encodeURIComponent("$" + current.name + "=" + current.value);
 }
 
 export default function ImageSettings() {

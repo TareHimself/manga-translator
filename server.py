@@ -77,7 +77,7 @@ REQUEST_SECTION_REGEX = r"id=([0-9]+)(.*)"
 REQUEST_SECTION_PARAMS_REGEX = r"\$([a-z0-9_]+)=([^\/$]+)"
 
 def extract_params(data: str) -> tuple[str,dict]:
-    selected_id, params_to_parse = re.findall(REQUEST_SECTION_REGEX,data)[0]
+    selected_id, params_to_parse = re.findall(REQUEST_SECTION_REGEX,urllib.parse.unquote(data))[0]
     params = {}
 
     if len(params_to_parse.strip()) > 0:
