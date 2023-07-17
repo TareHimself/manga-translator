@@ -28,7 +28,7 @@ function toDefaultArgs(args: IServerArgument[]): IToServerArgument[] {
 }
 
 function argsToString(total: string, current: IToServerArgument) {
-  return total + encodeURIComponent("$" + current.name + "=" + current.value);
+  return total + "$" + current.name + "=" + current.value;
 }
 
 export default function ImageSettings() {
@@ -67,11 +67,11 @@ export default function ImageSettings() {
         )}/id=${fontId}`;
       }
 
-      return (
+      return encodeURI(
         serverRequestUrl +
-        `/${address}${
-          address.includes("?") ? "&" : "?"
-        }dummy_timestamp_for_new_data=${Date.now().toFixed()}`
+          `/${address}${
+            address.includes("?") ? "&" : "?"
+          }dummy_timestamp_for_new_data=${Date.now().toFixed()}`
       );
     },
     [
@@ -104,7 +104,9 @@ export default function ImageSettings() {
         />
         <AiOutlineCloudUpload
           color="white"
-          onClick={() => dispatch(setImageAddress(imageSettings.imageAddress))}
+          onClick={() =>
+            dispatch(setImageAddress(encodeURI(imageSettings.imageAddress)))
+          }
         />
       </TileRow>
       <SelectTileRow
@@ -166,6 +168,7 @@ export default function ImageSettings() {
             <ArgsTileColumn
               category="Ocr"
               args={imageSettings.ocrArgs}
+              argsInfo={ocrs[ocrId].args}
               onArgumentUpdated={(idx, val) => {
                 setImageSettings((a) => {
                   a.ocrArgs[idx].value = val;
@@ -195,6 +198,7 @@ export default function ImageSettings() {
             <ArgsTileColumn
               category="Translator"
               args={imageSettings.translatorsArgs}
+              argsInfo={translators[translatorId].args}
               onArgumentUpdated={(idx, val) => {
                 setImageSettings((a) => {
                   a.translatorsArgs[idx].value = val;
@@ -209,8 +213,10 @@ export default function ImageSettings() {
         <div className="tile-row-content">
           <button
             onClick={() => {
-              if (imageAddress != imageSettings.imageAddress) {
-                dispatch(setImageAddress(imageSettings.imageAddress));
+              if (encodeURI(imageAddress) != imageSettings.imageAddress) {
+                dispatch(
+                  setImageAddress(encodeURI(imageSettings.imageAddress))
+                );
               }
 
               if (imageSettings.imageAddress.trim() === "") {

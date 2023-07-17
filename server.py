@@ -1,4 +1,3 @@
-import translator.inpainting # must be first import to handle exits
 import os
 import io
 import urllib.parse
@@ -9,9 +8,9 @@ import asyncio
 from tornado.web import RequestHandler, Application,StaticFileHandler
 from threading import Thread
 from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts,get_font_path_at_index
-from translator.pipelines import FullConversion
-from translator.translators import get_translators
-from translator.ocr import get_ocr,CleanOcr
+from translator.core.pipelines import FullConversion
+from translator.core.translators import get_translators
+from translator.core.ocr import get_ocr,CleanOcr
 from PIL import Image
 import json
 import re
@@ -66,8 +65,9 @@ def cv2_image_from_url(url: str):
     if url.startswith('http'):
         return pil_to_cv2(Image.open(io.BytesIO(requests.get(url).content)))
     else:
-        
-        data = cv2.imread(urllib.parse.unquote(url.split("?")[0]))
+        sanitized = urllib.parse.unquote(url.split("?")[0])
+        print(sanitized)
+        data = cv2.imread(sanitized)
         
         if data is None:
             raise BaseException(f"Failed to load image from path {url}")
@@ -82,7 +82,8 @@ def extract_params(data: str) -> tuple[str,dict]:
 
     if len(params_to_parse.strip()) > 0:
         for param_name,param_value in re.findall(REQUEST_SECTION_PARAMS_REGEX,params_to_parse.strip()):
-            params[param_name] = param_value
+            if len(param_value.strip()) > 0:
+                params[param_name] = param_value
 
     return  int(selected_id), params
 
@@ -117,6 +118,7 @@ class CleanFromWebHandler(RequestHandler):
         except:
             self.set_header("Content-Type", 'text/html')
             self.set_status(500)
+            traceback.print_exc()
             self.write(traceback.format_exc())
      
 class TranslateFromWebHandler(RequestHandler):
@@ -172,10 +174,12 @@ class ImageHandler(RequestHandler):
 
 
             item_path = "/".join(full_url.split("/")[4:])
+            
 
             if item_path.startswith("http"):
                 self.write(requests.get(item_path).content)
-            else:   
+            else:
+                item_path = urllib.parse.unquote(item_path)
                 if not os.path.exists(item_path):
                     self.set_status(404)
                 else:
@@ -253,7 +257,7 @@ async def main():
             (r"/(.*)",UiFilesHandler,dict(build_path = build_path)),
             ],**settings)
         app.listen(app_port)
-        webbrowser.open(f'http://localhost:{app_port}')
+        # webbrowser.open(f'http://localhost:{app_port}')
         await asyncio.Event().wait()
         
 
