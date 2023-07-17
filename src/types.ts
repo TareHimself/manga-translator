@@ -3,11 +3,24 @@ export interface IToServerArgument {
   value: string;
 }
 
-export interface IServerArgument {
+export enum EServerArgumentType {
+  TEXT = 0,
+  SELECT = 1,
+}
+
+export type IServerArgument = {
   name: string;
   description: string;
-  required: boolean;
-}
+} & (
+  | {
+      type: EServerArgumentType.TEXT;
+    }
+  | {
+      type: EServerArgumentType.SELECT;
+      options: IToServerArgument[];
+    }
+);
+
 
 export interface IServerItem {
   id: number;

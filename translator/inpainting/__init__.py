@@ -7,12 +7,17 @@ import os
 import queue
 import asyncio
 import sys
+import time
+import collections
+import atexit
 
 # In this file we queue all inpainting requests so other aspects can run on multiple threads (could also do that here but I am assuming shit gpu)
 
 INPAINT_MODEL_DEVICE = torch.device("cuda" if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "cpu")
 
 _inpaint_queue = queue.Queue()
+
+callback_queue = collections.deque()
 
 
 def _inpaint_thread():
@@ -96,15 +101,29 @@ def _inpaint_thread():
         # img_out = img_out.crop((0, 0, w, h))
 
         return img_out
-    
+    # # payload = _inpaint_queue.get()
+
+    # while True:
+    #     if len(callback_queue) > 0:
+    #         data = callback_queue.pop()
+    #         if data is None:
+    #             break
+    #         pil_image,pil_mask,model_path,callback = data
+    #         callback(inpaint(pil_image,pil_mask,model_path))
+    #     else:
+    #         time.sleep(1)
     payload = _inpaint_queue.get()
 
     while payload is not None:
-        pil_image,pil_mask,model_path,callback = payload
+        data = payload
+        pil_image,pil_mask,model_path,callback = data
         callback(inpaint(pil_image,pil_mask,model_path))
         payload = _inpaint_queue.get()
+            
+
 
 pending_tasks = []
+
 async def inpaint_async(image: Image,
         mask: Image,
         model_path: str = os.path.join(
@@ -118,9 +137,10 @@ async def inpaint_async(image: Image,
         nonlocal loop
         loop.call_soon_threadsafe(pending_task.set_result,inpaint_result)
 
+    # callback_queue.appendleft((image,mask,model_path,callback))
     _inpaint_queue.put((image,mask,model_path,callback))
-
     pending_tasks.append(pending_task)
+
     result = await pending_task
     pending_tasks.remove(pending_task)
     return result
@@ -133,33 +153,55 @@ def inpaint_threadsafe(image: Image,
     return asyncio.run(inpaint_async(image,mask,model_path))
 
 
-_running_thread = threading.Thread(target=_inpaint_thread,group=None)
+_running_thread = threading.Thread(target=_inpaint_thread,group=None,daemon=True)
 
 def _stop_inpaint_thread(signum, frame):
     sys.exit(signum)
 
 _running_thread.start()
+# signal.signal(signal.SIGINT,_stop_inpaint_thread)
+# signal.signal(signal.SIGABRT, _stop_inpaint_thread)
+# signal.signal(signal.SIGTERM, _stop_inpaint_thread)
 
-signal.signal(signal.SIGINT,_stop_inpaint_thread)
-signal.signal(signal.SIGABRT, _stop_inpaint_thread)
-signal.signal(signal.SIGTERM, _stop_inpaint_thread)
+# _og_exit = sys.exit
 
-_og_exit = sys.exit
+# def _new_sys_exit(*args,**kwargs):
+#     global _og_exit
+#     print("Exit Requested")
+#     try:
+#         # with _inpaint_queue.mutex:
+#         #     _inpaint_queue.queue.clear()
+#         for task in pending_tasks:
+#             task.cancel()
+#         # _inpaint_queue.put(None)
+#         # _running_thread.join()
+#     except:
+#         pass
+#     _og_exit(*args,**kwargs)
+    
 
-def _new_sys_exit(*args,**kwargs):
-    global _og_exit
+# sys.exit =  _new_sys_exit
+
+# import atexit
+
+# atexit.register(lambda : print("WANT TO EXIT"))
+
+
+def _exit_thread(*args,**kwargs):
     
     try:
-        with _inpaint_queue.mutex:
-            _inpaint_queue.queue.clear()
+        # with _inpaint_queue.mutex:
+        #     _inpaint_queue.queue.clear()
         for task in pending_tasks:
             task.cancel()
+        # callback_queue.put(None)
         _inpaint_queue.put(None)
         _running_thread.join()
     except:
         pass
-    _og_exit(*args,**kwargs)
     
 
-sys.exit =  _new_sys_exit
+
+
+atexit.register( _exit_thread)
     
