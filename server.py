@@ -257,7 +257,7 @@ async def main():
             (r"/(.*)",UiFilesHandler,dict(build_path = build_path)),
             ],**settings)
         app.listen(app_port)
-        # webbrowser.open(f'http://localhost:{app_port}')
+        webbrowser.open(f'http://localhost:{app_port}')
         await asyncio.Event().wait()
         
 
