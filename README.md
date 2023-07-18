@@ -39,11 +39,7 @@
 - [ ] Improve text resize algorithm, some texts are too small/big
 
 ## Models
-
-- [Detection](https://pixeldrain.com/u/hjjU79dU)
-- [Segmentation](https://pixeldrain.com/u/675HkiHx)
-- [Inpainting](https://pixeldrain.com/u/Qxnfugrj)
-- [Color Detection](https://pixeldrain.com/u/f6drbee1)
+- All current models are available for download [here](https://pixeldrain.com/l/9QGw78gR)
 
 ## Install
 
