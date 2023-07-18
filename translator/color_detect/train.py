@@ -31,12 +31,15 @@ def train_model(num_samples=6000,num_workers=5,backgrounds=[],epochs = 1000,batc
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
+    scaler = torch.cuda.amp.grad_scaler.GradScaler()
+
 
     best_loss = 99999999999
     best_epoch = 0
     patience = 20
     patience_count = 0
 
+    
     best_state = copy.deepcopy(model.state_dict())
 
     try:
@@ -49,14 +52,18 @@ def train_model(num_samples=6000,num_workers=5,backgrounds=[],epochs = 1000,batc
                 images = images.type(torch.FloatTensor).to(train_device)
                 results = results.type(torch.FloatTensor).to(train_device)
 
+                with torch.cuda.amp.autocast_mode.autocast():
+                    outputs: torch.Tensor = model(images)
+
+                    loss = criterion(outputs, results)
+
+
                 optimizer.zero_grad()
 
-                outputs: torch.Tensor = model(images)
 
-                loss = criterion(outputs, results)
-
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
                 # Calculate the element-wise distance between the arrays
                 distance = torch.abs(results - outputs)
@@ -85,7 +92,7 @@ def train_model(num_samples=6000,num_workers=5,backgrounds=[],epochs = 1000,batc
     except KeyboardInterrupt:
         print("Stopping training early at user request")
     
-    print("Best epoch at ",best_epoch,"with loss",best_loss)
+    print("Best epoch at ",best_epoch + 1,"with loss",best_loss)
     model.load_state_dict(best_state)
     return model
 
