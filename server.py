@@ -66,7 +66,6 @@ def cv2_image_from_url(url: str):
         return pil_to_cv2(Image.open(io.BytesIO(requests.get(url).content)))
     else:
         sanitized = urllib.parse.unquote(url.split("?")[0])
-        print(sanitized)
         data = cv2.imread(sanitized)
         
         if data is None:

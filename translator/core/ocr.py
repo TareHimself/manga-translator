@@ -1,7 +1,7 @@
 import numpy
 import traceback
 import os
-from translator.utils import cv2_to_pil, language_code_to_name,simplify_language_code, is_cuda_available, debug_image
+from translator.utils import cv2_to_pil, lang_code_to_name,simplify_lang_code, is_cuda_available, display_image
 from translator.core.plugin import BasePlugin, PluginArgument, PluginSelectArgument, PluginSelectArgumentOption
 
 class OcrResult:
@@ -158,7 +158,7 @@ class EasyOcr(BaseOcr):
     
     def get_arguments() -> list[PluginArgument]:
 
-        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=language_code_to_name(lang),value=lang) for lang in EasyOcr.languages]))
+        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in EasyOcr.languages]))
 
         return [PluginSelectArgument(name="language",
                                      description="The language to detect",
@@ -180,7 +180,7 @@ class TesseractOcr(BaseOcr):
     def do_ocr(self, text: numpy.ndarray):
         # debug_image(text,"Text")
         # return OcrResult(text=self.easy.readtext(text,detail = 0, paragraph=True)[0], language=self.language)#self.language)
-        return OcrResult(text=self.tesseract.image_to_string(text, lang=self.language),language=simplify_language_code(self.language))
+        return OcrResult(text=self.tesseract.image_to_string(text, lang=self.language),language=simplify_lang_code(self.language))
     
     def get_name() -> str:
         return "Tesseract Ocr"
@@ -204,7 +204,7 @@ class TesseractOcr(BaseOcr):
             languages.remove("jpn")
             languages.insert(0,"jpn")
 
-        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=language_code_to_name(lang),value=lang) for lang in languages]))
+        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in languages]))
         
         return [PluginSelectArgument(name="language",
                                      description="The language to detect",

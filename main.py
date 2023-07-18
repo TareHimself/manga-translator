@@ -6,9 +6,9 @@ import os
 import math
 import re
 import numpy as np
-from translator.pipelines import FullConversion
-from translator.translators import get_translators
-from translator.ocr import get_ocr
+from translator.core.pipelines import FullConversion
+from translator.core.translators import get_translators
+from translator.core.ocr import get_ocr
 import json
 
 EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
