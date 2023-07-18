@@ -6,21 +6,25 @@ class PluginArgumentType:
     SELECT = 1
 
 class PluginArgument:
-    def __init__(self,name: str,description: str) -> None:
+    def __init__(self,id: str,name: str,description: str,default: str="") -> None:
+        self.id = id
         self.name = name
         self.type = PluginArgumentType.TEXT
         self.description = description
+        self.default = default
 
     def get(self) -> dict[str,str]:
         return {
+            "id": self.id,
             "name": self.name,
-            "type": self.type,
             "description": self.description,
+            "default": self.default,
+            "type": self.type,
         }
     
 class PluginTextArgument(PluginArgument):
-    def __init__(self, name: str,description: str) -> None:
-        super().__init__(name, description)
+    def __init__(self, id: str,name: str,description: str,default: str="") -> None:
+        super().__init__(id,name,description,default)
         self.type = PluginArgumentType.TEXT
 
 class PluginSelectArgumentOption:
@@ -35,8 +39,8 @@ class PluginSelectArgumentOption:
         }
 
 class PluginSelectArgument(PluginArgument):
-    def __init__(self, name: str,description: str,options: list[PluginSelectArgumentOption]) -> None:
-        super().__init__(name, description)
+    def __init__(self,id: str,name: str,description: str,options: list[PluginSelectArgumentOption] ,default: str="") -> None:
+        super().__init__(id,name,description,default)
         self.type = PluginArgumentType.SELECT
         self.options = options
 

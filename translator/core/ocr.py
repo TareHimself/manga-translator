@@ -56,7 +56,7 @@ class MangaOcr(BaseOcr):
 class EasyOcr(BaseOcr):
     """Supports all the languages listed"""
 
-    languages = language_codes = [
+    languages =  [
         "ja",
         "abq",
         "ady",
@@ -142,12 +142,12 @@ class EasyOcr(BaseOcr):
         "vi"
     ]
     
-    def __init__(self,language = languages[0]) -> None:
+    def __init__(self,lang = languages[0]) -> None:
         import easyocr
 
         super().__init__()
-        self.easy = easyocr.Reader([language])
-        self.language = language
+        self.easy = easyocr.Reader([lang])
+        self.language = lang
 
     def do_ocr(self, text: numpy.ndarray):
         
@@ -160,9 +160,10 @@ class EasyOcr(BaseOcr):
 
         options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in EasyOcr.languages]))
 
-        return [PluginSelectArgument(name="language",
+        return [PluginSelectArgument(id="lang",
+                                     name="Language",
                                      description="The language to detect",
-                                     options=options)]
+                                     options=options,default=options[0].value)]
     
 
 class TesseractOcr(BaseOcr):
@@ -206,9 +207,10 @@ class TesseractOcr(BaseOcr):
 
         options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in languages]))
         
-        return [PluginSelectArgument(name="language",
+        return [PluginSelectArgument(id="language",
+                                     name="Language",
                                      description="The language to detect",
-                                     options=options)]
+                                     options=options,default=languages[0])]
         # options = [PluginSelectArgumentOption(name=value,value=key) for key, value in EasyOcr.languages.items()]
         # options.sort(key= lambda a: "." if a.value == "ja" else a.name)
         # return [PluginSelectArgument(name="language",

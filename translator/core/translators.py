@@ -37,7 +37,7 @@ class DeepLTranslator(Translator):
 
 
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(name="auth_token",description="DeepL Api Auth Token")]
+        return [PluginTextArgument(id="auth_token",name="Auth Token",description="DeepL Api Auth Token")]
 
     def translate(self, ocr_result: OcrResult):
         if self.auth_token is None or len(self.auth_token.strip()) == 0:
@@ -72,13 +72,13 @@ class DeepLTranslator(Translator):
 class GoogleTranslateTranslator(Translator):
     """Translates using google translate"""
 
-    def __init__(self, service_account_key_path="") -> None:
+    def __init__(self, key_path="") -> None:
         super().__init__()
 
-        self.key_path = service_account_key_path
+        self.key_path = key_path
 
         if len(self.key_path.strip()) > 0:
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
 
             from google.cloud import translate_v2 as translate
 
@@ -95,26 +95,27 @@ class GoogleTranslateTranslator(Translator):
         )["translatedText"]
     
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(name="service_account_key_path",description="Path to google application credentials")]
+        return [PluginTextArgument(id="key_path",name="Service Account Key Path",description="Path to google application credentials json")]
     
     def get_name() -> str:
         return "Google Cloud Translate"
 
 
-class HelsinkiNlpJapaneseToEnglish(Translator):
-    """Translates using this model on hugging face https://huggingface.co/Helsinki-NLP/opus-mt-ja-en"""
+class HuggingFace(Translator):
+    """Translates using hugging face models"""
 
-    def __init__(self) -> None:
+    def __init__(self,model_url: str = "Helsinki-NLP/opus-mt-ja-en") -> None:
         super().__init__()
-        self.pipeline = pipeline("translation", model="Helsinki-NLP/opus-mt-ja-en")
+        self.pipeline = pipeline("translation", model=model_url)
 
     def translate(self, ocr_result: OcrResult):
-        if ocr_result.language == "ja":
-            return self.pipeline(ocr_result.text)[0]["translation_text"]
-        return "Language not supported"
+        return self.pipeline(ocr_result.text)[0]["translation_text"]
     
     def get_name() -> str:
-        return "Helsinki NLP Japanese To English"
+        return "Hugging Face"
+    
+    def get_arguments() -> list[PluginArgument]:
+        return [PluginTextArgument(id="model_url",name="Model",description="The Hugging Face translation model to use",default="Helsinki-NLP/opus-mt-ja-en")]
 
     
 class DebugTranslator(Translator):
@@ -131,14 +132,15 @@ class DebugTranslator(Translator):
         return "Debug Translator"
     
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(name="text",description="What to write")]
+        return [PluginTextArgument(id="text",name="Debug Text",description="What to write")]
 
 
 def get_translators() -> list[Translator]:
-    return [
+    return list(filter(lambda a: a.is_valid(), [
         Translator,
         DeepLTranslator,
         GoogleTranslateTranslator,
-        HelsinkiNlpJapaneseToEnglish,
+        HuggingFace,
         DebugTranslator
-    ]
+    ]))
+    

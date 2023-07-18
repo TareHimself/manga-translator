@@ -50,7 +50,7 @@ class FullConversion:
         self,
         detect_model="models/detection.pt",
         seg_model="models/segmentation.pt",
-        color_detect_model="models/color_detection2.pt",
+        color_detect_model="models/color_detection.pt",
         translator=Translator(),
         ocr=BaseOcr(),
         font_file="fonts/animeace2_reg.ttf",

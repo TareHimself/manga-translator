@@ -76,7 +76,7 @@ REQUEST_SECTION_REGEX = r"id=([0-9]+)(.*)"
 REQUEST_SECTION_PARAMS_REGEX = r"\$([a-z0-9_]+)=([^\/$]+)"
 
 def extract_params(data: str) -> tuple[str,dict]:
-    selected_id, params_to_parse = re.findall(REQUEST_SECTION_REGEX,urllib.parse.unquote(data))[0]
+    selected_id, params_to_parse = re.findall(REQUEST_SECTION_REGEX,data)[0]
     params = {}
 
     if len(params_to_parse.strip()) > 0:
@@ -96,18 +96,21 @@ def send_file_in_chunks(request: RequestHandler,file_path):
 class CleanFromWebHandler(RequestHandler):
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header("Access-Control-Allow-Headers", "*")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'image/png')
 
+    def options(self):
+        self.set_status(200)
+
     @run_in_thread
-    def get(self):
+    def post(self):
         try:
-            full_url = self.request.full_url()
-        
-            target_url = full_url[full_url.index("/clean/") + len("/clean/"):]
+            data = json.loads(self.request.body)
+
+            image_url = data.get('image')
             
-            image_cv2 = cv2_image_from_url(target_url)
+            image_cv2 = cv2_image_from_url(image_url)
             result = clean_image(image_cv2)
             converted_pil = cv2_to_pil(result)
             img_byte_arr = io.BytesIO()
@@ -124,24 +127,28 @@ class TranslateFromWebHandler(RequestHandler):
 
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header("Access-Control-Allow-Headers", "*")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'image/png')
 
+    def options(self):
+        self.set_status(200)
+
     @run_in_thread
-    def get(self,translator_info,ocr_info,font_info):
+    def post(self):
         try:
-            full_url = self.request.full_url()
+
+            data = json.loads(self.request.body)
+
+            image_url = data.get('image')
             
-            target_url = "/".join(full_url.split("/")[7:])
-
-            translator_id,translator_params = extract_params(translator_info)
+            translator_id,translator_params = data.get('translator',0),data.get('translatorArgs',{})
             
-            ocr_id,ocr_params = extract_params(ocr_info)
+            ocr_id,ocr_params = data.get('ocr',0),data.get('ocrArgs',{})
 
-            font_id,_ = extract_params(font_info)
+            font_id = data.get('font',0)
 
-            image_cv2 = cv2_image_from_url(target_url)
+            image_cv2 = cv2_image_from_url(image_url)
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),ocr=get_ocr()[ocr_id](**ocr_params),font_file=get_font_path_at_index(font_id))
 
@@ -162,7 +169,7 @@ class ImageHandler(RequestHandler):
 
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header("Access-Control-Allow-Headers", "*")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'image/*')
 
@@ -193,7 +200,7 @@ class BaseHandler(RequestHandler):
 
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header("Access-Control-Allow-Headers", "*")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'application/json')
 
@@ -250,8 +257,8 @@ async def main():
         app = Application([
             (r"/",UiHandler),
             (r"/info", BaseHandler),
-            (r"/clean/.*",CleanFromWebHandler),
-            (r"/translate/(id=[^\/]*)/(id=[^\/]*)/(id=[^\/]*)/.*",TranslateFromWebHandler),
+            (r"/clean",CleanFromWebHandler),
+            (r"/translate",TranslateFromWebHandler),
             (r"/images/.*", ImageHandler),
             (r"/(.*)",UiFilesHandler,dict(build_path = build_path)),
             ],**settings)
