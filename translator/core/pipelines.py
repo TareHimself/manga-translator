@@ -4,13 +4,17 @@ import sys
 from ultralytics import YOLO
 from requests.utils import requote_uri
 from translator.utils import (
+    get_outline_color,
     mask_text_and_make_bubble_mask,
     draw_text_in_bubble,
     get_bounds_for_text,
-    fix_intersection,
+    TranslatorGlobals,
     inpaint_optimized,
-    debug_image,
-    prep_color_detection_sample
+    display_image,
+    transform_sample,
+    adjust_contrast_brightness,
+    get_average_color,
+    luminance_similarity
 )
 import threading
 import torch
@@ -56,6 +60,7 @@ class FullConversion:
             self.color_detect_model = get_color_detection_model(weights_path=color_detect_model,device=torch.device("cuda:0"))
             self.color_detect_model.eval()
         except:
+            self.color_detect_model = None
             pass
 
         self.translator = translator
@@ -252,11 +257,24 @@ class FullConversion:
 
         # third pass, draw text
         text_colors = [(0,0,0) for x in to_translate]
-        # with torch.no_grad(): model needs work
-        #     with torch.inference_mode():
-        #         with self.frame_process_mutex: # this may not be needed
-        #             text_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(torch.stack([prep_color_detection_sample(x[2]) for x in to_translate]).to(torch.device("cuda:0")))]
         
+        if self.color_detect_model is not None:
+            with torch.no_grad(): # model needs work
+                with torch.inference_mode():
+                    with self.frame_process_mutex: # this may not be needed
+                        def fix_image(frame):
+                            frame = adjust_contrast_brightness(frame,contrast=2)
+                            # cv2.GaussianBlur(, (size_dil, size_dil), 0)
+                            # final_mask_dilation = 6
+                            # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
+                            # return cv2.dilate(frame,kernel,iterations = 1)
+                            return frame
+                        
+                        images = [fix_image(x[2].copy()) for x in to_translate]
+                        # images = [x[2].copy() for x in to_translate]
+                        # [debug_image(x,"To Detect") for x in images]
+                        text_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(torch.stack([transform_sample(y) for y in images]).to(torch.device("cuda:0")))]
+            
         for i in range(len(to_translate)):
             bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
             text_color = text_colors[i]
@@ -266,11 +284,25 @@ class FullConversion:
                 # debug_image(text_as_image,"Item")
                 translation = self.translator(self.ocr, text_as_image)
                 if len(translation.strip()):
+                    draw_surface = frame[y1:y2, x1:x2]
+                    # draw_surface_color = get_average_color(draw_surface)
+
+                    if luminance_similarity(text_color,TranslatorGlobals.COLOR_BLACK) >= .7:
+                        text_color = TranslatorGlobals.COLOR_BLACK
+
+                    elif luminance_similarity(text_color,TranslatorGlobals.COLOR_WHITE) >= .9:
+                        text_color = TranslatorGlobals.COLOR_WHITE
+
+                    outline_color = get_outline_color(draw_surface,text_color)
+                    
+                    # if outline_color is None:
+
+                    #     print("Similarities",luminance_similarity(text_color,draw_surface_color))
+
                     frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                        bubble, text_draw_bounds, translation,font_file=self.font_file,color=text_color
+                        bubble, text_draw_bounds, translation,font_file=self.font_file,color=text_color, outline_color=outline_color
                     )
-            else:
-                frame[y1:y2, x1:x2] = draw_text_in_bubble(bubble, text_draw_bounds,font_file=self.font_file)
+            
 
         
         return frame

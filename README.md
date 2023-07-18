@@ -43,6 +43,7 @@
 - [Detection](https://pixeldrain.com/u/hjjU79dU)
 - [Segmentation](https://pixeldrain.com/u/675HkiHx)
 - [Inpainting](https://pixeldrain.com/u/Qxnfugrj)
+- [Color Detection](https://pixeldrain.com/u/y5k2su77) (Ironically not Reliable on black/white text)
 
 ## Install
 

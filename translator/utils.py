@@ -6,6 +6,7 @@ import os
 import math
 import shutil
 import torch
+import threading
 import pycountry
 import numpy as np
 import PySimpleGUI as sg
@@ -18,7 +19,11 @@ from hyphen.textwrap2 import wrap
 from tqdm import tqdm
 from collections import deque
 
-def simplify_language_code(code: str) -> Union[str,None]:
+class TranslatorGlobals:
+    COLOR_BLACK = np.array((0,0,0))
+    COLOR_WHITE = np.array((255,255,255))
+
+def simplify_lang_code(code: str) -> Union[str,None]:
     try:
         lang = pycountry.languages.lookup(code)
         if lang.alpha_2 is not None:
@@ -28,13 +33,13 @@ def simplify_language_code(code: str) -> Union[str,None]:
     except:
         return code
     
-def language_code_to_name(code: str) -> Union[str,None]:
+def lang_code_to_name(code: str) -> Union[str,None]:
     try:
         return pycountry.languages.lookup(code).name
     except:
         return None
-    
-def adjust_contrast_brightness(img, contrast: float = 1.0, brightness: int = 0):
+
+def adjust_contrast_brightness(img: np.ndarray, contrast: float = 1.0, brightness: int = 0):
     """
     Adjusts contrast and brightness of an uint8 image.
     contrast:   (0.0,  inf) with 1.0 leaving the contrast as is
@@ -44,7 +49,7 @@ def adjust_contrast_brightness(img, contrast: float = 1.0, brightness: int = 0):
     return cv2.addWeighted(img, contrast, img, 0, brightness)
 
 
-def has_white(image):
+def has_white(image: np.ndarray):
     # Set RGB values for white
     white_lower = np.array([200, 200, 200], dtype=np.uint8)
     white_upper = np.array([255, 255, 255], dtype=np.uint8)
@@ -55,39 +60,42 @@ def has_white(image):
     # Check if any white pixels were found
     return cv2.countNonZero(white_pixels) > 0
 
-def debug_image(img, name="debug"):
+display_image_lock = threading.Lock()
+def display_image(img: np.ndarray, name: str="debug"):
+    global display_image_lock
 
-    # Convert the CV2 image array to a format compatible with PySimpleGUI
-    image_bytes = cv2.imencode('.png', img)[1].tobytes()
+    with display_image_lock:
+        # Convert the CV2 image array to a format compatible with PySimpleGUI
+        image_bytes = cv2.imencode('.png', img)[1].tobytes()
 
-    # Create the GUI layout
-    layout = [[sg.Text(text=name)],
-              [sg.Image(data=image_bytes)],
-              [sg.Button('Save'), sg.Button('Close')]]
+        # Create the GUI layout
+        layout = [[sg.Text(text=name)],
+                [sg.Image(data=image_bytes)],
+                [sg.Button('Save'), sg.Button('Close')]]
 
-    # Create the window
-    window = sg.Window(name, layout,location=(0,0))
+        # Create the window
+        window = sg.Window(name, layout)
 
-    # Event loop to handle events
-    while True:
-        event, values = window.read()
-        if event == sg.WINDOW_CLOSED or event == 'Close':
-            break
+        # Event loop to handle events
+        while True:
+            event, values = window.read()
+            if event == sg.WINDOW_CLOSED or event == 'Close':
+                break
 
-        if event == "Save":
-            cv2.imwrite(name + ".png",img)
+            if event == "Save":
+                cv2.imwrite(name + ".png",img)
 
-    # Close the window
-    window.close()
+        # Close the window
+        window.close()
 
 
-def ensure_gray(img):
+def ensure_gray(img: np.ndarray):
     if len(img.shape) > 2:
         return cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
     return img.copy()
 
 
-def do_mask(a, b, mask, inv=False):
+def apply_mask(a: np.ndarray, b: np.ndarray, mask: np.ndarray, inv=False):
     mask = ensure_gray(mask)
     a_loc, b_loc = a.copy(), b.copy()
     mask_inv = cv2.bitwise_not(mask)
@@ -102,21 +110,7 @@ def do_mask(a, b, mask, inv=False):
     return cv2.add(a_loc, b_loc)
 
 
-def clean_text(frame, frame_mask):
-    text = frame.copy()
-    # cleaned = frame.copy()
-    # cleaned = do_mask(
-    #     cleaned,
-    #     np.full(cleaned.shape, 255, dtype=cleaned.dtype),
-    #     frame_mask,
-    # )
-    cleaned = pil_to_cv2(inpaint_threadsafe(cv2_to_pil(frame), cv2_to_pil(frame_mask)))
-    text = do_mask(text, np.full(text.shape, 255, dtype=text.dtype), frame_mask, True)
-    return text, cleaned
-
-
-
-def make_bubble_mask(frame):
+def make_bubble_mask(frame: np.ndarray):
     image = frame.copy()
     # Apply a Gaussian blur to reduce noise
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
@@ -164,7 +158,7 @@ def make_bubble_mask(frame):
     return adjust_contrast_brightness(mask, 100)
 
 
-def get_masked_bounds(mask):
+def get_masked_bounds(mask: np.ndarray):
     gray = ensure_gray(mask)
 
     # Threshold the image
@@ -182,11 +176,11 @@ def get_masked_bounds(mask):
 
     return x , y , x + w , y + h
 
-def get_histogram_for_region(frame,region_mask = None):
+def get_histogram_for_region(frame: np.ndarray,region_mask = None):
     masked_frame = cv2.bitwise_and(frame,frame, mask=ensure_gray(region_mask if region_mask is not None else np.full_like(frame,255)))
     return cv2.calcHist([masked_frame], [0, 1, 2], None, [256, 256, 256], [0, 256, 0, 256, 0, 256])
 
-def mask_text_and_make_bubble_mask(frame, frame_text_mask, frame_cleaned):
+def mask_text_and_make_bubble_mask(frame: np.ndarray, frame_text_mask: np.ndarray, frame_cleaned: np.ndarray):
     # debug_image(frame_cleaned)
     x1,y1,x2,y2 = get_masked_bounds(frame_text_mask)
 
@@ -194,7 +188,7 @@ def mask_text_and_make_bubble_mask(frame, frame_text_mask, frame_cleaned):
 
     mask_section = frame_text_mask.copy()[y1:y2, x1:x2]
 
-    text = do_mask(
+    text = apply_mask(
         frame_section,
         np.full(frame_section.shape, 255, dtype=frame_section.dtype),
         mask_section,
@@ -204,11 +198,11 @@ def mask_text_and_make_bubble_mask(frame, frame_text_mask, frame_cleaned):
     return text, make_bubble_mask(frame_cleaned)
 
 
-def cv2_to_pil(img) -> Image:
+def cv2_to_pil(img: np.ndarray) -> Image:
     return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
 
-def pil_to_cv2(img) -> np.ndarray:
+def pil_to_cv2(img: Image) -> np.ndarray:
     arr = np.array(img)
 
     if len(arr.shape) == 2:
@@ -220,7 +214,7 @@ def pil_to_cv2(img) -> np.ndarray:
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 
-def get_bounds_for_text(frame_mask):
+def get_bounds_for_text(frame_mask: np.ndarray):
 
     gray = ensure_gray(frame_mask)
     # Threshold the image
@@ -240,7 +234,7 @@ def get_bounds_for_text(frame_mask):
 
 
 def fix_order_after_intersection_fix(
-    a1, a2, b1, b2, was_sorted, was_intersecting=False
+    a1: int, a2: int, b1: int, b2: int, was_sorted: bool, was_intersecting: bool =False
 ):
     if was_sorted:
         return b1, b2, a1, a2, was_intersecting
@@ -248,7 +242,7 @@ def fix_order_after_intersection_fix(
     return a1, a2, b1, b2, was_intersecting
 
 
-def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
+def fix_intersection(a1: int, a2: int, b1: int, b2: int, sorted: bool=False, was_sorted: bool=False):
     if not sorted:
         if a1[0] < b1[0]:
             return fix_intersection(a1, a2, b1, b2, True)
@@ -295,12 +289,10 @@ def fix_intersection(a1, a2, b1, b2, sorted=False, was_sorted=False):
 
         return fix_order_after_intersection_fix(a1, a2, b1, b2, was_sorted, True)
     
-def simplify_points(points):
-    # Convert the points to a NumPy array
-    points_array = np.array(points)
+def simplify_points(points: np.ndarray):
     
     # Find the convex hull of the points
-    hull = cv2.convexHull(points_array)
+    hull = cv2.convexHull(points)
     
     # Convert the convex hull back to a list of points
     simplified_points = np.array([np.array(x) for x in hull.squeeze().tolist()])
@@ -364,8 +356,8 @@ def inpaint_optimized(
     frame: np.ndarray,
     mask: np.ndarray,
     filtered: list,
-    max_height=256,
-    max_width=256,
+    max_height: int=256,
+    max_width: int=256,
 ):
     h, w, c = frame.shape
     max_height = int(math.floor(max_height / 8) * 8)
@@ -437,7 +429,7 @@ def inpaint_optimized(
             -1,
         )
 
-        region_mask = do_mask(
+        region_mask = apply_mask(
             region_mask, np.zeros_like(region_mask), focus_mask, True
         )
 
@@ -457,9 +449,9 @@ def inpaint_optimized(
             refined_mask = np.zeros_like(region_mask)
             refined_mask[target_region_y1:target_region_y2 , target_region_x1:target_region_x2] = mask_text_for_inpainting(section_to_refine,section_to_refine_mask)
             
-            text_mask[y1:y2, x1:x2][target_region_y1:target_region_y2 , target_region_x1:target_region_x2] = refined_mask[target_region_y1:target_region_y2 , target_region_x1:target_region_x2].copy()
             
-            final_mask_dilation = 6
+            
+            final_mask_dilation = 7
             kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
             refined_mask = cv2.dilate(refined_mask,kernel,iterations = 1)
 
@@ -467,14 +459,16 @@ def inpaint_optimized(
                 inpaint_threadsafe(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(refined_mask))
             )[target_region_y1:target_region_y2 , target_region_x1:target_region_x2]
 
+            text_mask[y1:y2, x1:x2][target_region_y1:target_region_y2 , target_region_x1:target_region_x2] = refined_mask[target_region_y1:target_region_y2 , target_region_x1:target_region_x2].copy()
+
     return final,text_mask
 
 
-def pixels_to_pt(pixels):
+def pixels_to_pt(pixels: int):
     return pixels * 12 / 16
 
 
-def pt_to_pixels(pt):
+def pt_to_pixels(pt: int):
     return pt * (16 / 12)
 
 
@@ -553,7 +547,7 @@ def wrap_text(text: str, max_chars: int,hyphenator: Union[Hyphenator,None]):
     return try_merge_hypnenated(lines, max_chars)
 
 
-def get_fonts():
+def get_fonts() -> list[str]:
     fonts = []
     idx = 0
     for file in filter(lambda a: a.endswith('.ttf'),os.listdir("./fonts")):
@@ -571,7 +565,7 @@ def get_font_path_at_index(idx: int):
     return os.path.join("./fonts",list(filter(lambda a: a.endswith('.ttf'),os.listdir("./fonts")))[idx])
 
 
-def get_average_font_size(font, text="some text here"):
+def get_average_font_size(font: ImageFont, text="some text here"):
     x, y, w, h = font.getbbox(text)
     widths = list(map(lambda a: font.getbbox(a)[2], list(text)))
     widths.sort(reverse=True)
@@ -579,16 +573,16 @@ def get_average_font_size(font, text="some text here"):
 
 
 def get_best_font_size(
-    text,
-    wh,
-    font_file,
-    space_between_lines=1,
-    start_size=18,
-    step=1,
-    min_chars_per_line=6,
-    initial_iterations=0,
+    text: str,
+    wh: tuple[int,int],
+    font_file: str,
+    space_between_lines: int=1,
+    start_size: int=18,
+    step: int=1,
+    min_chars_per_line: int=6,
+    initial_iterations: int=0,
     hyphenator: Union[Hyphenator,None] = None
-):
+) -> Union[tuple[None,None,None,int],tuple[int,int,int,int]]:
     current_font_size = start_size
     current_font = None
     max_width, max_height = wh
@@ -600,25 +594,10 @@ def get_best_font_size(
         if current_font_size < 0:
             return None, None, None, iterations
 
-        # if current_font_size < 6:
-        #     print(
-        #         "REDUCING MIN CHARACTERS FROM",
-        #         min_chars_per_line,
-        #         "TO",
-        #         min_chars_per_line - 1,
-        #     )
-        #     return get_best_font_size(
-        #         text,
-        #         wh,
-        #         font_file,
-        #         space_between_lines,
-        #         start_size,
-        #         step,
-        #         min_chars_per_line - 1,
-        #         iterations,
-        #     )
         current_font = ImageFont.truetype(font_file, current_font_size)
+
         cur_f_width, cur_f_height = get_average_font_size(current_font, text)
+
         chars_per_line = math.floor(max_width / cur_f_width)
         # print(
         #     "DEBUG",
@@ -647,7 +626,7 @@ def get_best_font_size(
 
 
 
-def color_diff(color1, color2):
+def color_diff(color1:np.ndarray, color2: np.ndarray):
     # Calculate the color difference using Euclidean distance formula
     return np.sqrt(np.sum((color1 - color2)**2))
 
@@ -659,87 +638,86 @@ def draw_text_in_bubble(
     color = (0,0,0),
     outline=1,
     outline_color: Union[tuple[int,int,int],None] = (255,255,255),
-    hyphenator: Union[Hyphenator,None] = Hyphenator("en_US") 
+    hyphenator: Union[Hyphenator,None] = Hyphenator("en_US"),
+    offset: tuple[int,int] = (0,0)
 ):
-    # print(color)
-    # print(color_diff(np.array([round(x) for x in cv2.mean(frame)][0:3]),color))
-    if color_diff(np.array([255,255,255]),color) < 35:
-        color = (255,255,255)
-        outline_color = None
-    
-    # debug_image(frame,"Draw Area")
-    pt1, pt2 = bounds
+    # print(color_diff(np.array(color),np.array((0,0,0))))
+    if len(text) > 0:
+        pt1, pt2 = bounds
 
-    max_height = pt2[1] - pt1[1]
-    max_width = pt2[0] - pt1[0]
+        max_height = pt2[1] - pt1[1]
+        max_width = pt2[0] - pt1[0]
 
-    # fill background incase of segmentation errors
-    # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
-    # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
+        # fill background incase of segmentation errors
+        # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
+        # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
-    space_between_lines = 2
-    font_size, chars_per_line, line_height, iters = get_best_font_size(
-        text,
-        (max_width, max_height),
-        font_file,
-        space_between_lines,
-        30,
-        1,
-        hyphenator = hyphenator
-    )
-
-    # frame = cv2.putText(
-    #     frame,
-    #     f"{font_size}",
-    #     (0, 20),
-    #     cv2.FONT_HERSHEY_SIMPLEX,
-    #     0.2,
-    #     (255, 0, 0),
-    #     1,
-    #     cv2.LINE_AA,
-    # )
-
-    # print(text, font_size, chars_per_line, line_height, iters)
-    if not font_size:
-        return frame
-    frame_to_pil = cv2_to_pil(frame)
-    draw = ImageDraw.Draw(frame_to_pil)
-
-    font = ImageFont.truetype(font_file, font_size)
-    draw_x = pt1[0]
-    draw_y = pt1[1]
-
-    wrapped = wrap_text(text, chars_per_line,hyphenator = hyphenator)
-    
-    for line_no in range(len(wrapped)):
-        line = wrapped[line_no]
-        x, y, w, h = font.getbbox(line)
-        draw.text(
-            (
-                draw_x + abs(((max_width - w) / 2)),
-                draw_y
-                + space_between_lines
-                + (
-                    (
-                        max_height
-                        - (
-                            (len(wrapped) * line_height)
-                            + (len(wrapped) * space_between_lines)
-                        )
-                    )
-                    / 2
-                )
-                + (line_no * line_height)
-                + (space_between_lines * line_no),
-            ),
-            str(line),
-            fill=(*color, 255),
-            font=font,
-            stroke_width=outline if outline_color is not None else 0,
-            stroke_fill=outline_color
+        space_between_lines = 2
+        font_size, chars_per_line, line_height, iters = get_best_font_size(
+            text,
+            (max_width, max_height),
+            font_file,
+            space_between_lines,
+            30,
+            1,
+            hyphenator = hyphenator
         )
 
-    return pil_to_cv2(frame_to_pil)
+        # frame = cv2.putText(
+        #     frame,
+        #     f"{font_size}",
+        #     (0, 20),
+        #     cv2.FONT_HERSHEY_SIMPLEX,
+        #     0.2,
+        #     (255, 0, 0),
+        #     1,
+        #     cv2.LINE_AA,
+        # )
+
+        # print(text, font_size, chars_per_line, line_height, iters)
+        if not font_size:
+            return frame
+        frame_to_pil = cv2_to_pil(frame)
+        draw = ImageDraw.Draw(frame_to_pil)
+
+        font = ImageFont.truetype(font_file, font_size)
+
+        draw_x = pt1[0] + offset[0]
+        draw_y = pt1[1] + offset[1]
+
+        wrapped = wrap_text(text, chars_per_line,hyphenator = hyphenator)
+        
+        for line_no in range(len(wrapped)):
+            line = wrapped[line_no]
+            x, y, w, h = font.getbbox(line)
+            draw.text(
+                (
+                    draw_x + abs(((max_width - w) / 2)),
+                    draw_y
+                    + space_between_lines
+                    + (
+                        (
+                            max_height
+                            - (
+                                (len(wrapped) * line_height)
+                                + (len(wrapped) * space_between_lines)
+                            )
+                        )
+                        / 2
+                    )
+                    + (line_no * line_height)
+                    + (space_between_lines * line_no),
+                ),
+                str(line),
+                fill=(*color, 255),
+                font=font,
+                stroke_width=outline if outline_color is not None else 0,
+                stroke_fill=outline_color
+            )
+
+        return pil_to_cv2(frame_to_pil)
+    else:
+        return frame
 
 
 
@@ -781,7 +759,6 @@ def random_section_from_image(image: np.ndarray,section_size: tuple[int,int],gen
 
     img_h, img_w, _ = image.shape
     section_w, section_h = section_size
-
     if img_h - section_h < 0 or img_w - section_w < 0:
         return None
 
@@ -797,28 +774,90 @@ def rand_color(generator=random.Random()):
     return (generator.randint(0,255),generator.randint(0,255),generator.randint(0,255))
 
 
-def generate_color_detection_train_example(text: str = "Sample",background: np.ndarray = np.ones((200,200,3),dtype=np.uint8) * 255,size: tuple[int,int] = (200,200),font_file="fonts/animeace2_reg.ttf",outline_thresh=100,generator=random.Random()):
-    draw_surface = random_section_from_image(background,size,generator)
+def get_average_color(surface: np.ndarray):
+    return np.array([round(x) for x in cv2.mean(surface)][0:3])
 
-    surface_color = np.array([round(x) for x in cv2.mean(draw_surface)][0:3])
+def get_luminance(color: np.ndarray):
+    '''Calculates luminance of a bgr color. 1 is bright, 0 is dark'''
+    b,g,r = color / 255
+
+    return (0.2126*r) + (0.7152*g) + (0.0722*b) # https://en.wikipedia.org/wiki/Luminance_%28relative%29
+
+def luminance_similarity(a: np.ndarray,b: np.ndarray):
+    return 1 - abs(get_luminance(a) - get_luminance(b))
+
+def get_outline_color(surface: np.ndarray,text_color: np.ndarray,min_outline_lum=0.35):
+    surface_color = get_average_color(surface)
+
+    color_white,color_black = np.array((255,255,255),dtype=np.uint8),np.array((0,0,0),dtype=np.uint8)
+
+    lum_similarity = luminance_similarity(text_color,surface_color)
+
+    # debug_image(surface,"Surface")
+    if lum_similarity > min_outline_lum: # we will most likely need an outline to not clash with the background
+        white_similarity = luminance_similarity(text_color,color_white)
+
+        if white_similarity > .7: # make outline black if text is more white than black
+            return tuple([x for x in color_black])
+    else:
+        return None
+    
+    return tuple([x for x in color_white])
+
+def generate_color_detection_train_example(text: str = "Sample",background: np.ndarray = None,size: tuple[int,int] = (200,200),shift_max: tuple[int,int] = (20,20),font_file="fonts/animeace2_reg.ttf",generator=random.Random()):
+    
+    bg_choices = [np.zeros((*size[::-1],3),dtype=np.uint8),np.full((*size[::-1],3),255,dtype=np.uint8)]
+
+    if background is not None:
+        bg_choices.append(background)
+
+    draw_surface = random_section_from_image(generator.choice(bg_choices),size,generator) # background, white or black
+
+    if draw_surface is None: # background was too small
+        draw_surface = random_section_from_image(generator.choice(bg_choices[0:2]),size,generator) # white or black
 
     draw_text_color = generator.choice([np.array(rand_color(generator)),np.array((0,0,0)),np.array((255,255,255))]) # random color, white or black
 
-    outline_color = (255,255,255)
+    outline_color = get_outline_color(draw_surface,draw_text_color)
 
-    if color_diff(surface_color,draw_text_color) < outline_thresh:
-        if color_diff(draw_text_color,np.array(outline_color)) < color_diff(draw_text_color,np.array((0,0,0))):
-            outline_color = (0,0,0)
+    frame_drawn = draw_text_in_bubble(draw_surface,((0,0),(draw_surface.shape[1],draw_surface.shape[0])),text,font_file=font_file,color=draw_text_color,outline_color=outline_color,hyphenator=None,outline=2,offset=[generator.randint(-1 * x,x) for x in shift_max])
+    
+    return frame_drawn,draw_text_color
 
-    return draw_text_in_bubble(draw_surface,((0,0),(draw_surface.shape[1],draw_surface.shape[0])),text,font_file=font_file,color=draw_text_color,outline_color=outline_color,hyphenator=None,outline=2),draw_text_color
-
-prep_color_detection_sample = transforms.Compose([
+torch_sample_transformer = transforms.Compose([
     transforms.ToTensor(),
     transforms.ToPILImage(),
     transforms.Resize((224,224)),
     transforms.ToTensor(),
     transforms.Normalize([0,0,0],[255,255,255]),
 ])
+
+def transform_sample(cv2_image: np.ndarray,pad_img = True):
+    image = cv2_image.copy()
+
+    if pad_img:
+        height, width = image.shape[:2]
+
+        max_dim = max(height, width) + 50
+
+        # Calculate the amount of padding needed for each dimension
+        pad_height = max_dim - height
+        pad_width = max_dim - width
+
+        # Determine the amount of padding on each side of the image
+        top = pad_height // 2
+        bottom = pad_height - top
+        left = pad_width // 2
+        right = pad_width - left
+
+        # Set the pad color to white (255)
+        pad_color = (255, 255, 255)  # White in RGB
+
+        # Pad the image with the calculated padding
+        image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=pad_color)
+        # debug_image(image,"padded")
+    
+    return torch_sample_transformer(image)
 
 class COCO_TO_YOLO_TASK:
     SEGMENTATION = "seg"
