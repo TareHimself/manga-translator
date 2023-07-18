@@ -171,7 +171,7 @@ def get_masked_bounds(mask: np.ndarray):
     all_contours = []
     for c in contours:
         all_contours.extend(c)
-
+    # display_image(mask,"Test")
     x, y, w, h = cv2.boundingRect(np.array(all_contours))
 
     return x , y , x + w , y + h

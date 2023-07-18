@@ -14,8 +14,10 @@ from translator.utils import (
     transform_sample,
     adjust_contrast_brightness,
     get_average_color,
-    luminance_similarity
+    luminance_similarity,
+    has_white
 )
+import traceback
 import threading
 import torch
 import concurrent
@@ -48,7 +50,7 @@ class FullConversion:
         self,
         detect_model="models/detection.pt",
         seg_model="models/segmentation.pt",
-        color_detect_model="models/color_detection.pt",
+        color_detect_model="models/color_detection2.pt",
         translator=Translator(),
         ocr=BaseOcr(),
         font_file="fonts/animeace2_reg.ttf",
@@ -61,7 +63,7 @@ class FullConversion:
             self.color_detect_model.eval()
         except:
             self.color_detect_model = None
-            pass
+            traceback.print_exc()
 
         self.translator = translator
         self.ocr = ocr
@@ -147,14 +149,15 @@ class FullConversion:
                 # debug_image(inpainted, "Inpainted")
                 # # if len(bubble.shape) < 3:
                 # #     continue
-                text_only, bubble_mask = mask_text_and_make_bubble_mask(
-                    bubble, bubble_text_mask, bubble_clean
-                )
+                if has_white(bubble_text_mask):
+                    text_only, bubble_mask = mask_text_and_make_bubble_mask(
+                        bubble, bubble_text_mask, bubble_clean
+                    )
 
-                frame[y1:y2, x1:x2] = bubble_clean
-                text_draw_bounds = get_bounds_for_text(bubble_mask)
-                to_translate.append([bbox, bubble, text_only, text_draw_bounds])
-                # debug_image(text_only,"Text Only")
+                    frame[y1:y2, x1:x2] = bubble_clean
+                    text_draw_bounds = get_bounds_for_text(bubble_mask)
+                    to_translate.append([bbox, bubble, text_only, text_draw_bounds])
+                    # debug_image(text_only,"Text Only")
             else:
                 frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
 
@@ -256,14 +259,14 @@ class FullConversion:
                     # print("intersection found")
 
         # third pass, draw text
-        text_colors = [(0,0,0) for x in to_translate]
+        text_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
         
         if self.color_detect_model is not None:
             with torch.no_grad(): # model needs work
                 with torch.inference_mode():
                     with self.frame_process_mutex: # this may not be needed
                         def fix_image(frame):
-                            frame = adjust_contrast_brightness(frame,contrast=2)
+                            # frame = adjust_contrast_brightness(frame,contrast=2)
                             # cv2.GaussianBlur(, (size_dil, size_dil), 0)
                             # final_mask_dilation = 6
                             # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
@@ -274,6 +277,8 @@ class FullConversion:
                         # images = [x[2].copy() for x in to_translate]
                         # [debug_image(x,"To Detect") for x in images]
                         text_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(torch.stack([transform_sample(y) for y in images]).to(torch.device("cuda:0")))]
+        else:
+            print("Using black since color detect model is not valid")
             
         for i in range(len(to_translate)):
             bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
@@ -287,11 +292,11 @@ class FullConversion:
                     draw_surface = frame[y1:y2, x1:x2]
                     # draw_surface_color = get_average_color(draw_surface)
 
-                    if luminance_similarity(text_color,TranslatorGlobals.COLOR_BLACK) >= .7:
-                        text_color = TranslatorGlobals.COLOR_BLACK
+                    # if luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_BLACK) >= .7:
+                    #     text_color = TranslatorGlobals.COLOR_BLACK
 
-                    elif luminance_similarity(text_color,TranslatorGlobals.COLOR_WHITE) >= .9:
-                        text_color = TranslatorGlobals.COLOR_WHITE
+                    # elif luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_WHITE) >= .9:
+                    #     text_color = TranslatorGlobals.COLOR_WHITE
 
                     outline_color = get_outline_color(draw_surface,text_color)
                     

@@ -115,6 +115,7 @@ class HelsinkiNlpJapaneseToEnglish(Translator):
     
     def get_name() -> str:
         return "Helsinki NLP Japanese To English"
+
     
 class DebugTranslator(Translator):
     """Writes the specified text"""
