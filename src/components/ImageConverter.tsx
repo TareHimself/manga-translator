@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
-import { setConvertedImageLoaded } from "../redux/slices/app";
+import { setConvertedImageLoading } from "../redux/slices/app";
 import { EImageFit } from "../types";
 
 export default function ImageConverter() {
@@ -14,8 +14,8 @@ export default function ImageConverter() {
     (a) => a.app.convertedImageAddress
   );
 
-  const convertedImageLoaded = useAppSelector(
-    (a) => a.app.convertedImageLoaded
+  const convertedImageLoading = useAppSelector(
+    (a) => a.app.convertedImageLoading
   );
 
   const imageFit = useAppSelector((a) => a.app.imageFit);
@@ -29,11 +29,7 @@ export default function ImageConverter() {
         data-fit={imageFit === EImageFit.FIT_TO_PAGE ? "page" : "scroll"}
       >
         <img
-          className={`original${
-            convertedImageLoaded || convertedImageAddress.length === 0
-              ? ""
-              : " loading"
-          }`}
+          className={`original${!convertedImageLoading ? "" : " loading"}`}
           src={originalImageAddress}
           alt="original"
           onLoadStart={() => {
@@ -45,18 +41,20 @@ export default function ImageConverter() {
             }, 1000);
           }}
         />
-        {hasMainImageLoaded && (
+        {hasMainImageLoaded && convertedImageAddress.length > 0 && (
           <img
             className="converted"
             src={convertedImageAddress}
             alt="converted"
             onLoad={() => {
               if (hasMainImageLoaded) {
-                dispatch(setConvertedImageLoaded(true));
+                dispatch(setConvertedImageLoading(false));
               }
             }}
             style={
-              convertedImageLoaded && hasMainImageLoaded
+              !convertedImageLoading &&
+              hasMainImageLoaded &&
+              convertedImageAddress.length > 0
                 ? undefined
                 : { opacity: 0 }
             }

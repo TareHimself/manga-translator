@@ -1,15 +1,15 @@
 import {
   EServerArgumentType,
-  IServerArgument,
-  IToServerArgument,
+  IPluginArgument,
+  IPluginArgumentInfo,
 } from "../types";
 import SelectTileRow from "./SelectTileRow";
 import TileRow from "./TileRow";
 
 export type ArgsTileColumnProps = {
   category: string;
-  args: IToServerArgument[];
-  argsInfo: IServerArgument[];
+  args: IPluginArgumentInfo[];
+  argsInfo: IPluginArgument[];
   onArgumentUpdated: (idx: number, update: string) => void;
 };
 
@@ -18,13 +18,15 @@ export default function ArgsTileColumn(props: ArgsTileColumnProps) {
     <>
       {props.args.map((a, idx) => {
         const info = props.argsInfo[idx];
-        const argumentName = props.category + " | " + a.name;
+        const argumentName = props.category + " | " + info.name;
         const argumentKey = `${idx}`;
         if (info.type === EServerArgumentType.TEXT) {
+          console.log(info, argumentName);
           return (
             <TileRow name={argumentName} key={argumentKey}>
               <input
                 type="text"
+                defaultValue={info.default}
                 onChange={(e) => props.onArgumentUpdated(idx, e.target.value)}
               />
             </TileRow>
