@@ -1,4 +1,3 @@
-import translator.inpainting # must be first import to handle exits
 import argparse
 import cv2
 import sys
@@ -9,7 +8,6 @@ import numpy as np
 from translator.core.pipelines import FullConversion
 from translator.core.translators import get_translators
 from translator.core.ocr import get_ocr
-import json
 
 EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
 
@@ -39,7 +37,7 @@ def json_to_args(args_str: str):
         a = item.strip()
         equ_idx = a.index("=")
         key = a[0:equ_idx]
-        value = eval(a[equ_idx + 1 :])
+        value = eval(a[equ_idx + 1:])
         args[key] = value
     return args
 
@@ -95,14 +93,14 @@ def do_convert(files: list[str], tran: int, tran_args: str, ocr: int, ocr_args: 
     filenames = files
     batches = math.ceil(len(filenames) / 4)
     for i in range(batches):
-        files_to_convert = filenames[i * 4 : (i + 1) * 4]
+        files_to_convert = filenames[i * 4: (i + 1) * 4]
         for filename, data in zip(
-            files_to_convert, converter([cv2.imread(file) for file in files_to_convert])
+                files_to_convert, converter([cv2.imread(file) for file in files_to_convert])
         ):
             frame = data
             ext = re.findall(EXTENSION_REGEX, filename)[0]
             cv2.imwrite(
-                filename[0 : len(filename) - (len(ext) + 1)] + "_converted." + ext,
+                filename[0: len(filename) - (len(ext) + 1)] + "_converted." + ext,
                 frame,
             )
         print(f"Converted Batch {i + 1}/{batches}")
@@ -137,7 +135,7 @@ def main():
         default=0,
         type=int,
         help="R|Set the index of the ocr class to use. must be one of the following\n"
-        + convert_to_options_list(get_ocr()),
+             + convert_to_options_list(get_ocr()),
         required=False,
     )
 
@@ -156,7 +154,7 @@ def main():
         default=0,
         type=int,
         help="R|Set the index of the translator class to use. must be one of the following\n"
-        + convert_to_options_list(get_translators()),
+             + convert_to_options_list(get_translators()),
         required=False,
     )
 

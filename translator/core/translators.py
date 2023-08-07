@@ -7,6 +7,7 @@ from requests.utils import requote_uri
 from translator.core.ocr import BaseOcr, OcrResult
 from translator.core.plugin import BasePlugin, PluginArgument, PluginTextArgument
 
+
 class Translator(BasePlugin):
     """Base Class for all Translator classes"""
 
@@ -21,11 +22,10 @@ class Translator(BasePlugin):
 
     def translate(self, ocr_result: OcrResult) -> str:
         return ocr_result.text
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Base Translator"
-    
-    
 
 
 class DeepLTranslator(Translator):
@@ -35,21 +35,20 @@ class DeepLTranslator(Translator):
         super().__init__()
         self.auth_token = auth_token
 
-
+    @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="auth_token",name="Auth Token",description="DeepL Api Auth Token")]
+        return [PluginTextArgument(id="auth_token", name="Auth Token", description="DeepL Api Auth Token")]
 
     def translate(self, ocr_result: OcrResult):
         if self.auth_token is None or len(self.auth_token.strip()) == 0:
             return "Need DeepL Auth"
-        
+
         if ocr_result.language == "ja":
             try:
-                data = [("target_lang", "EN-US"), ("source_lang", "JA")]
-                data.append(("text", ocr_result.text))
+                data = [("target_lang", "EN-US"), ("source_lang", "JA"), ("text", ocr_result.text)]
                 uri = f"https://api-free.deepl.com/v2/translate?{'&'.join([f'{data[i][0]}={data[i][1]}' for i in range(len(data))])}"
                 uri = requote_uri(uri)
-                
+
                 return requests.post(
                     uri,
                     headers={
@@ -57,20 +56,19 @@ class DeepLTranslator(Translator):
                         "Content-Type": "application/x-www-form-urlencoded",
                     },
                 ).json()["translations"][0]["text"]
-            except Exception as e:
+            except:
                 traceback.print_exc()
                 return "Failed To Get Translation"
         else:
             return "Language not supported"
-        
+
+    @staticmethod
     def get_name() -> str:
         return "DeepL Translator"
-        
-    
 
 
 class GoogleTranslateTranslator(Translator):
-    """Translates using google translate"""
+    """Translates using Google Translate"""
 
     def __init__(self, key_path="") -> None:
         super().__init__()
@@ -89,14 +87,17 @@ class GoogleTranslateTranslator(Translator):
     def translate(self, ocr_result: OcrResult):
         if self.trans is None:
             return "Invalid Key Path"
-        
+
         return self.trans.translate(
             ocr_result.text, source_language=ocr_result.language, target_language="en"
         )["translatedText"]
-    
+
+    @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="key_path",name="Service Account Key Path",description="Path to google application credentials json")]
-    
+        return [PluginTextArgument(id="key_path", name="Service Account Key Path",
+                                   description="Path to google application credentials json")]
+
+    @staticmethod
     def get_name() -> str:
         return "Google Cloud Translate"
 
@@ -104,35 +105,41 @@ class GoogleTranslateTranslator(Translator):
 class HuggingFace(Translator):
     """Translates using hugging face models"""
 
-    def __init__(self,model_url: str = "Helsinki-NLP/opus-mt-ja-en") -> None:
+    def __init__(self, model_url: str = "Helsinki-NLP/opus-mt-ja-en") -> None:
         super().__init__()
         self.pipeline = pipeline("translation", model=model_url)
 
     def translate(self, ocr_result: OcrResult):
         return self.pipeline(ocr_result.text)[0]["translation_text"]
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Hugging Face"
-    
-    def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="model_url",name="Model",description="The Hugging Face translation model to use",default="Helsinki-NLP/opus-mt-ja-en")]
 
-    
+    @staticmethod
+    def get_arguments() -> list[PluginArgument]:
+        return [
+            PluginTextArgument(id="model_url", name="Model", description="The Hugging Face translation model to use",
+                               default="staka/fugumt-ja-en")]
+
+
 class DebugTranslator(Translator):
     """Writes the specified text"""
 
-    def __init__(self,text="") -> None:
+    def __init__(self, text="") -> None:
         super().__init__()
         self.to_write = text
 
     def translate(self, ocr_result: OcrResult):
         return self.to_write
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Debug Translator"
-    
+
+    @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="text",name="Debug Text",description="What to write")]
+        return [PluginTextArgument(id="text", name="Debug Text", description="What to write")]
 
 
 def get_translators() -> list[Translator]:
@@ -143,4 +150,3 @@ def get_translators() -> list[Translator]:
         HuggingFace,
         DebugTranslator
     ]))
-    

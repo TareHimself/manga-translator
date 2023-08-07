@@ -1,8 +1,9 @@
 import numpy
 import traceback
 import os
-from translator.utils import cv2_to_pil, lang_code_to_name,simplify_lang_code, is_cuda_available, display_image
+from translator.utils import cv2_to_pil, lang_code_to_name, simplify_lang_code
 from translator.core.plugin import BasePlugin, PluginArgument, PluginSelectArgument, PluginSelectArgumentOption
+
 
 class OcrResult:
     def __init__(self, text: str = "", language: str = "en") -> None:
@@ -21,10 +22,12 @@ class BaseOcr(BasePlugin):
 
     def do_ocr(self, text: numpy.ndarray):
         return OcrResult("Sample")
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Base Ocr"
-    
+
+
 class CleanOcr(BaseOcr):
     """Cleans The Image i.e. does nothing"""
 
@@ -33,7 +36,8 @@ class CleanOcr(BaseOcr):
 
     def do_ocr(self, text: numpy.ndarray):
         return OcrResult("", "")
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Clean Ocr"
 
@@ -49,14 +53,16 @@ class MangaOcr(BaseOcr):
 
     def do_ocr(self, text: numpy.ndarray):
         return OcrResult(self.manga_ocr(cv2_to_pil(text)), "ja")
-    
+
+    @staticmethod
     def get_name() -> str:
         return "Manga Ocr"
-    
+
+
 class EasyOcr(BaseOcr):
     """Supports all the languages listed"""
 
-    languages =  [
+    languages = [
         "ja",
         "abq",
         "ady",
@@ -141,8 +147,8 @@ class EasyOcr(BaseOcr):
         "uz",
         "vi"
     ]
-    
-    def __init__(self,lang = languages[0]) -> None:
+
+    def __init__(self, lang=languages[0]) -> None:
         import easyocr
 
         super().__init__()
@@ -150,28 +156,32 @@ class EasyOcr(BaseOcr):
         self.language = lang
 
     def do_ocr(self, text: numpy.ndarray):
-        
-        return OcrResult(text=self.easy.readtext(text,detail = 0, paragraph=True)[0], language=self.language)#self.language)
-    
+        return OcrResult(text=self.easy.readtext(text, detail=0, paragraph=True)[0],
+                         language=self.language)  # self.language)
+
+    @staticmethod
     def get_name() -> str:
         return "Easy Ocr"
-    
-    def get_arguments() -> list[PluginArgument]:
 
-        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in EasyOcr.languages]))
+    @staticmethod
+    def get_arguments() -> list[PluginArgument]:
+        options = list(filter(lambda a: a.name is not None,
+                              [PluginSelectArgumentOption(name=lang_code_to_name(lang), value=lang) for lang in
+                               EasyOcr.languages]))
 
         return [PluginSelectArgument(id="lang",
                                      name="Language",
                                      description="The language to detect",
-                                     options=options,default=options[0].value)]
-    
+                                     options=options, default=options[0].value)]
+
 
 class TesseractOcr(BaseOcr):
     """Supports all the languages listed"""
 
     default_language = "jpn"
     tessaract_path = os.path.abspath("C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
-    def __init__(self,language = default_language) -> None:
+
+    def __init__(self, language=default_language) -> None:
         import pytesseract
         pytesseract.pytesseract.tesseract_cmd = TesseractOcr.tessaract_path
         super().__init__()
@@ -179,13 +189,14 @@ class TesseractOcr(BaseOcr):
         self.language = language
 
     def do_ocr(self, text: numpy.ndarray):
-        # debug_image(text,"Text")
-        # return OcrResult(text=self.easy.readtext(text,detail = 0, paragraph=True)[0], language=self.language)#self.language)
-        return OcrResult(text=self.tesseract.image_to_string(text, lang=self.language),language=simplify_lang_code(self.language))
-    
+        return OcrResult(text=self.tesseract.image_to_string(text, lang=self.language),
+                         language=simplify_lang_code(self.language))
+
+    @staticmethod
     def get_name() -> str:
         return "Tesseract Ocr"
-    
+
+    @staticmethod
     def is_valid() -> bool:
         try:
             import pytesseract
@@ -195,7 +206,8 @@ class TesseractOcr(BaseOcr):
         except:
             traceback.print_exc()
             return False
-            
+
+    @staticmethod
     def get_arguments() -> list[PluginArgument]:
         import pytesseract
         pytesseract.pytesseract.tesseract_cmd = TesseractOcr.tessaract_path
@@ -203,20 +215,22 @@ class TesseractOcr(BaseOcr):
         languages.sort()
         if "jpn" in languages:
             languages.remove("jpn")
-            languages.insert(0,"jpn")
+            languages.insert(0, "jpn")
 
-        options = list(filter(lambda a: a.name is not None,[PluginSelectArgumentOption(name=lang_code_to_name(lang),value=lang) for lang in languages]))
-        
+        options = list(filter(lambda a: a.name is not None,
+                              [PluginSelectArgumentOption(name=lang_code_to_name(lang), value=lang) for lang in
+                               languages]))
+
         return [PluginSelectArgument(id="language",
                                      name="Language",
                                      description="The language to detect",
-                                     options=options,default=languages[0])]
+                                     options=options, default=languages[0])]
         # options = [PluginSelectArgumentOption(name=value,value=key) for key, value in EasyOcr.languages.items()]
         # options.sort(key= lambda a: "." if a.value == "ja" else a.name)
         # return [PluginSelectArgument(name="language",
         #                              description="The language to detect",
         #                              options=options)]
-        
 
-def get_ocr()  -> list[BaseOcr]:
-    return list(filter(lambda a: a.is_valid(),[BaseOcr,CleanOcr, MangaOcr,EasyOcr,TesseractOcr]))
+
+def get_ocr() -> list[BaseOcr]:
+    return list(filter(lambda a: a.is_valid(), [BaseOcr, CleanOcr, MangaOcr, EasyOcr, TesseractOcr]))

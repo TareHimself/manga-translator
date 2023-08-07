@@ -116,13 +116,14 @@ export const AppSlice = createSlice({
   reducers: {
     setTranslatorId: (state, action: PayloadAction<number>) => {
       state.translatorId = action.payload;
+      console.log("USING ARGS,",state.translators[action.payload].args)
       state.translatorArgs = toDefaultArgs(
-        state.translators[state.translatorId].args
+        state.translators[action.payload].args
       );
     },
     setOcrId: (state, action: PayloadAction<number>) => {
       state.ocrId = action.payload;
-      state.ocrArgs = toDefaultArgs(state.ocrs[state.ocrId].args);
+      state.ocrArgs = toDefaultArgs(state.ocrs[action.payload].args);
     },
     setFontId: (state, action: PayloadAction<number>) => {
       state.fontId = action.payload;

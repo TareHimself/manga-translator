@@ -19,12 +19,13 @@ export default function ArgsTileColumn(props: ArgsTileColumnProps) {
       {props.args.map((a, idx) => {
         const info = props.argsInfo[idx];
         const argumentName = props.category + " | " + info.name;
-        const argumentKey = `${idx}`;
+        const argumentKey = `${info.id}`;
         if (info.type === EServerArgumentType.TEXT) {
           console.log(info, argumentName);
           return (
             <TileRow name={argumentName} key={argumentKey}>
               <input
+                key={argumentKey}
                 type="text"
                 defaultValue={info.default}
                 onChange={(e) => props.onArgumentUpdated(idx, e.target.value)}
