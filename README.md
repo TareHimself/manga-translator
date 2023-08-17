@@ -56,6 +56,7 @@ conda activate manga-translator
 
 ```bash
 poetry install
+poe install-deps
 # For cuda support run "poe force-cuda"
 ```
 - Download models to models/modelname (i.e. models/detection.py)
