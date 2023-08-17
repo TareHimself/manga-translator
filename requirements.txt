@@ -1,0 +1,17 @@
+ultralytics == 8.0.118
+pillow == 9.5.0
+pyhyphen == 4.0.3
+google-cloud-translate == 3.11.1
+mss == 9.0.1
+manga-ocr == 0.1.10
+largestinteriorrectangle == 0.2.0
+sentencepiece == 0.1.99
+tornado == 6.3.2
+easyocr == 1.7.0
+pytesseract == 0.3.10
+pycountry == 22.3.5
+opencv-python == 4.8.0.74
+pysimplegui == 4.60.5
+timm == 0.9.2
+Faker == 19.1.0
+roboflow == 1.1.3

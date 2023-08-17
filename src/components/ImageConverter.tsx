@@ -27,6 +27,7 @@ export default function ImageConverter() {
       <div
         className="tile"
         data-fit={imageFit === EImageFit.FIT_TO_PAGE ? "page" : "scroll"}
+        style={{ justifyContent: "flex-start"}}
       >
         <img
           className={`original${!convertedImageLoading ? "" : " loading"}`}

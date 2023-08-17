@@ -4,6 +4,7 @@ import cv2
 import json
 import os
 import math
+import time
 import shutil
 import torch
 import threading
@@ -51,6 +52,14 @@ def adjust_contrast_brightness(img: np.ndarray, contrast: float = 1.0, brightnes
     brightness += int(round(255 * (1 - contrast) / 2))
     return cv2.addWeighted(img, contrast, img, 0, brightness)
 
+def measure_runtime(func):
+    def wrapper(*args,**kwargs):
+        start = time.time()
+        result = func(*args,**kwargs)
+        print(f"{func.__name__} Took {((time.time() - start) * 1000):.6f} MS")
+        return result
+    return wrapper
+        
 
 def has_white(image: np.ndarray):
     # Set RGB values for white
@@ -905,7 +914,8 @@ def generate_color_detection_train_example(text: str = "Sample", background: np.
 torch_sample_transformer = transforms.Compose([
     transforms.ToTensor(),
     transforms.ToPILImage(),
-    transforms.Resize((224, 224)),
+    #transforms.Resize((224, 224)),
+    transforms.Resize((80, 80)),
     transforms.ToTensor(),
     transforms.Normalize([0, 0, 0], [255, 255, 255]),
 ])
@@ -1180,8 +1190,8 @@ def roboflow_coco_to_yolo(dataset_dir):
             labels[final_filename].extend(computed)
 
         for filename, computed in tqdm(labels.items(), desc="Saving Labels"):
-            with open(os.path.join(labels_dir, filename), "wt") as f:
-                f.write("\n".join(computed))
+            with open(os.path.join(labels_dir, filename), "wt") as J:
+                J.write("\n".join(computed))
 
     os.remove(annotations_path)
 

@@ -7,7 +7,7 @@ from .datasets import ColorDetectionDataset
 from .models import get_color_detection_model
 
 
-def train_model(num_samples=6000, num_workers=5, backgrounds=[], epochs=1000, batch_size=32, learning_rate=0.001,
+def train_model(num_samples=6000, num_workers=7, backgrounds=[], epochs=1000, batch_size=32, learning_rate=0.001,
                 weights_path=None, seed=200, train_device=torch.device("cuda:0")):
     dataset = ColorDetectionDataset(generate_target=num_samples, backgrounds=backgrounds, generator_seed=seed,
                                     num_workers=num_workers)
