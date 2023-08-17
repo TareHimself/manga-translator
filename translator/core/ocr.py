@@ -204,7 +204,7 @@ class TesseractOcr(BaseOcr):
             pytesseract.get_tesseract_version()
             return True
         except:
-            traceback.print_exc()
+            print("Either pytesseract is having an error or you do not have it installed!.")
             return False
 
     @staticmethod
