@@ -10,7 +10,8 @@ from translator.utils import (
     TranslatorGlobals,
     in_paint_optimized,
     transform_sample,
-    has_white
+    has_white,
+    display_image
 )
 import traceback
 import threading
@@ -254,7 +255,7 @@ class FullConversion:
         # third pass, draw text
         text_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
 
-        if self.color_detect_model is not None:
+        if self.color_detect_model is not None and len(text_colors) > 0:
             with torch.no_grad():  # model needs work
                 with torch.inference_mode():
                     with self.frame_process_mutex:  # this may not be needed
@@ -265,10 +266,11 @@ class FullConversion:
                             # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
                             # return cv2.dilate(frame,kernel,iterations = 1)
                             return frame
-
+                        
                         images = [fix_image(x[2].copy()) for x in to_translate]
                         # images = [x[2].copy() for x in to_translate]
-                        # [debug_image(x,"To Detect") for x in images]
+                        # [display_image(x,"To Detect") for x in images]
+                        
                         text_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(
                             torch.stack([transform_sample(y) for y in images]).to(torch.device("cuda:0")))]
         else:

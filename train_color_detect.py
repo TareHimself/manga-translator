@@ -13,8 +13,8 @@ pytorch_device = torch.device("cuda:0")
 backgrounds = [cv2.imread(f"./backgrounds/{x}") for x in
                os.listdir("./backgrounds")]  # some background noise for the dataset
 
-model = train_model(epochs=10000, backgrounds=backgrounds, seed=30, train_device=pytorch_device, num_samples=30000,
-                    num_workers=10, weights_path="models/color_detection.pt")  # trains then returns the trained model
+model = train_model(epochs=10000, backgrounds=backgrounds, seed=30, train_device=pytorch_device, num_samples=70000,
+                    num_workers=1, weights_path="models/color_detection.pt")  # trains then returns the trained model
 
 torch.save(model.state_dict(), "trained.pt")
 
