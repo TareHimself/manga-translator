@@ -3,7 +3,6 @@ runs
 *.pyc
 .DS_Store
 datasets/*
-*.json
 *.lock
 *.pt
 *.pth
@@ -31,3 +30,7 @@ datasets/*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+manga-translator-service-account-data.json
+exa/*
+public/*
+trans.py
