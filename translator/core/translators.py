@@ -4,8 +4,9 @@ import traceback
 import os
 from transformers import pipeline
 from requests.utils import requote_uri
+from translator.utils import get_languages
 from translator.core.ocr import BaseOcr, OcrResult
-from translator.core.plugin import BasePlugin, PluginArgument, PluginTextArgument
+from translator.core.plugin import BasePlugin, PluginArgument, PluginTextArgument,PluginSelectArgument, PluginSelectArgumentOption
 
 
 class Translator(BasePlugin):
@@ -142,17 +143,39 @@ class DebugTranslator(Translator):
         return [PluginTextArgument(id="text", name="Debug Text", description="What to write")]
 
 
-class DebugTranslator(Translator):
-    """Writes the specified text"""
+class OpenAiTranslator(Translator):
+    """Uses an Open Ai Model for translation"""
 
-    def __init__(self, api_key="") -> None:
+    MODELS = [
+        ("GPT 3.5 Turbo","gpt-3.5-turbo"),
+        ("GPT 4","gpt-4"),
+        ("GPT 4 0314","gpt-4-0314"),
+        ("GPT 4 32K","gpt-4-32k"),
+        ("GPT 4 32K 0314","gpt-4-32k-0314"),
+        ("GPT 3.5 Turbo 0301","gpt-3.5-turbo-0301"),
+        ("Text Davinci 003","text-davinci-003"),
+        ("Code Davinci 002","code-davinci-002")
+    ]
+    
+    def __init__(self, api_key="",target_lang = "en",model=MODELS[0][1],temp="0.5") -> None:
         super().__init__()
         import openai
         openai.api_key = api_key
+        self.openai = openai
+        self.target_lang = target_lang
+        self.model = model
+        self.temp = float(temp)
         
 
     def translate(self, ocr_result: OcrResult):
-        return self.to_write
+        result = self.openai.ChatCompletion.create(
+            model=self.model,
+            messages=[
+                {"role":"user","content":f"Translate from {ocr_result.language.capitalize()} To {self.target_lang.capitalize()}\n{ocr_result.text}"}
+                ],
+            
+        )
+        return result['choices'][0].message['content'].strip()
 
     @staticmethod
     def get_name() -> str:
@@ -160,7 +183,12 @@ class DebugTranslator(Translator):
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="api_key", name="Open Ai Api Key", description="Your api Key")]
+        languages = get_languages()
+        options = list(map(lambda a : PluginSelectArgumentOption(a[0],a[1]),languages))
+
+        return [PluginTextArgument(id="api_key", name="Open Ai Api Key", description="Your api Key"),
+                PluginSelectArgument(id="target_lang",name="Target Language",description="The language to translate to",options=options,default="en"),
+                PluginSelectArgument(id="model",name="Model",description="The model to use",options=list(map(lambda a: PluginSelectArgumentOption(a[0],a[1]),OpenAiTranslator.MODELS)),default=OpenAiTranslator.MODELS[0][1])]
 
 
 def get_translators() -> list[Translator]:

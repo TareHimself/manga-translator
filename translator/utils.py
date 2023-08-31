@@ -28,13 +28,13 @@ class TranslatorGlobals:
 def simplify_lang_code(code: str) -> Union[str, None]:
     try:
         lang = pycountry.languages.lookup(code)
-        if lang.alpha_2 is not None:
-            return lang.alpha_2
-        elif lang.alpha_3 is not None:
-            return lang.alpha_3
+
+        return getattr(lang,'alpha_2',getattr(lang,'alpha_3',None))
     except:
         return code
 
+def get_languages() -> list[tuple[str,str]]:
+    return filter(lambda a: a[1] is not None,list(map(lambda a : (a.name,getattr(a,'alpha_2',getattr(a,'alpha_3',None))),list(pycountry.languages))))
 
 def lang_code_to_name(code: str) -> Union[str, None]:
     try:
