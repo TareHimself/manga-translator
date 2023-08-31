@@ -197,5 +197,6 @@ def get_translators() -> list[Translator]:
         DeepLTranslator,
         GoogleTranslateTranslator,
         HuggingFace,
-        DebugTranslator
+        DebugTranslator,
+        OpenAiTranslator
     ]))
