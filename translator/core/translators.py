@@ -142,6 +142,27 @@ class DebugTranslator(Translator):
         return [PluginTextArgument(id="text", name="Debug Text", description="What to write")]
 
 
+class DebugTranslator(Translator):
+    """Writes the specified text"""
+
+    def __init__(self, api_key="") -> None:
+        super().__init__()
+        import openai
+        openai.api_key = api_key
+        
+
+    def translate(self, ocr_result: OcrResult):
+        return self.to_write
+
+    @staticmethod
+    def get_name() -> str:
+        return "GPT Translator"
+
+    @staticmethod
+    def get_arguments() -> list[PluginArgument]:
+        return [PluginTextArgument(id="api_key", name="Open Ai Api Key", description="Your api Key")]
+
+
 def get_translators() -> list[Translator]:
     return list(filter(lambda a: a.is_valid(), [
         Translator,

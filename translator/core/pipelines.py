@@ -1,3 +1,4 @@
+import time
 import cv2
 import numpy as np
 import sys
@@ -55,9 +56,12 @@ class FullConversion:
         self.segmentation_model = YOLO(seg_model)
         self.detection_model = YOLO(detect_model)
         try:
-            self.color_detect_model = get_color_detection_model(weights_path=color_detect_model,
+            if color_detect_model is not None:
+                self.color_detect_model = get_color_detection_model(weights_path=color_detect_model,
                                                                 device=torch.device("cuda:0"))
-            self.color_detect_model.eval()
+                self.color_detect_model.eval()
+            else:
+                self.color_detect_model = None
         except:
             self.color_detect_model = None
             traceback.print_exc()
@@ -106,11 +110,15 @@ class FullConversion:
                 (x1, y1, x2, y2) = bbox
                 text_mask = cv2.rectangle(text_mask, (x1, y1), (x2, y2), (255, 255, 255), -1)
 
+
+        start = time.time()
         frame_clean, text_mask = in_paint_optimized(
             frame,
             text_mask,
             detect_result,  # segmentation_results.boxes.xyxy.cpu().numpy()
         )
+
+        print(f"Initial Inpainting took {time.time() - start} seconds")
 
         return frame, frame_clean, text_mask, detect_result
 
@@ -255,6 +263,7 @@ class FullConversion:
         # third pass, draw text
         text_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
 
+        start = time.time()
         if self.color_detect_model is not None and len(text_colors) > 0:
             with torch.no_grad():  # model needs work
                 with torch.inference_mode():
@@ -276,46 +285,89 @@ class FullConversion:
         else:
             print("Using black since color detect model is not valid")
 
-        for i in range(len(to_translate)):
-            bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
-            text_color = text_colors[i]
+        print(f"Color Detection took {time.time() - start} seconds")
+
+
+        start = time.time()
+
+        to_draw = []
+        # for i in range(len(to_translate)):
+        #     bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
+        #     text_color = text_colors[i]
+        #     (x1, y1, x2, y2) = bbox
+
+        #     if self.translator and self.ocr:
+        #         # debug_image(text_as_image,"Item")
+        #         translation = self.translator(self.ocr, text_as_image)
+        #         if len(translation.strip()):
+        #             to_draw.append((bbox,bubble,text_draw_bounds,text_color,translation))
+
+
+        if self.translator and self.ocr:
+            with ThreadPoolExecutor(max_workers=len(to_translate)) as executor:
+                futures = []
+
+                def get_translation(translator,ocr,img,data):
+                    return translator(ocr, img),data
+
+                for i in range(len(to_translate)):
+                    bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
+                    text_color = text_colors[i]
+                    (x1, y1, x2, y2) = bbox
+
+                    futures.append(executor.submit(get_translation,self.translator,self.ocr,text_as_image,(bbox,bubble,text_draw_bounds,text_color)))
+
+
+                for future in futures:
+                    translation,data = future.result()
+                    if len(translation.strip()):
+                            to_draw.append((*data,translation))
+                        
+
+        print(f"Fetching translations took {time.time() - start} seconds")
+
+
+        start = time.time()
+        print(f"Drawing {len(to_draw)}")
+        for bbox,bubble,text_draw_bounds,text_color,translation in to_draw:
             (x1, y1, x2, y2) = bbox
+            print("Drawing TEXT",translation)
+            draw_surface = frame[y1:y2, x1:x2]
+            # draw_surface_color = get_average_color(draw_surface)
 
-            if self.translator and self.ocr:
-                # debug_image(text_as_image,"Item")
-                translation = self.translator(self.ocr, text_as_image)
-                if len(translation.strip()):
-                    draw_surface = frame[y1:y2, x1:x2]
-                    # draw_surface_color = get_average_color(draw_surface)
+            # if luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_BLACK) >= .7:
+            #     text_color = TranslatorGlobals.COLOR_BLACK
 
-                    # if luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_BLACK) >= .7:
-                    #     text_color = TranslatorGlobals.COLOR_BLACK
+            # elif luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_WHITE) >= .9:
+            #     text_color = TranslatorGlobals.COLOR_WHITE
 
-                    # elif luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_WHITE) >= .9:
-                    #     text_color = TranslatorGlobals.COLOR_WHITE
+            outline_color = get_outline_color(draw_surface, text_color)
 
-                    outline_color = get_outline_color(draw_surface, text_color)
+            # if outline_color is None:
 
-                    # if outline_color is None:
+            #     print("Similarities",luminance_similarity(text_color,draw_surface_color))
 
-                    #     print("Similarities",luminance_similarity(text_color,draw_surface_color))
+            frame[y1:y2, x1:x2] = draw_text_in_bubble(
+                bubble, text_draw_bounds, translation, font_file=self.font_file, color=text_color,
+                outline_color=outline_color
+            )
 
-                    frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                        bubble, text_draw_bounds, translation, font_file=self.font_file, color=text_color,
-                        outline_color=outline_color
-                    )
-
+        print(f"Drawing text took {time.time() - start} seconds")
         return frame
 
     def __call__(self, images: list[np.ndarray],
                  yolo_device=0 if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "mps" if sys.platform != "darwin" else torch.device(
                      'cpu')) -> list[np.ndarray]:
         # frames = [resize_percent(x, 50) for x in frames]
+        total_start = time.time()
+        start = time.time()
         to_process = [x for x in zip(
             self.detection_model(images, device=yolo_device, verbose=False), self.segmentation_model(
                 images, device=yolo_device, verbose=False
             ), images
         )]
+
+        print(f"Yolov8 Models took {time.time() - start} seconds")
 
         with ThreadPoolExecutor(max_workers=len(to_process)) as executor:
             futures = []
@@ -323,5 +375,6 @@ class FullConversion:
                 detect_result, seg_result, frame = to_process[i]
                 futures.append(executor.submit(self.process_frame, detect_result=detect_result, seg_result=seg_result,
                                                frame=frame))
-
-            return list(map(lambda a: a.result(), futures))
+            result = list(map(lambda a: a.result(), futures))
+            print(f"Total Process took {time.time() - total_start} seconds")
+            return result

@@ -135,7 +135,7 @@ class TranslateFromWebHandler(RequestHandler):
             image_cv2 = cv2_image_from_url(image_url)
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),
-                                       ocr=get_ocr()[ocr_id](**ocr_params), font_file=get_font_path_at_index(font_id))
+                                       ocr=get_ocr()[ocr_id](**ocr_params), font_file=get_font_path_at_index(font_id),color_detect_model=None)
 
             result = converter([image_cv2])[0]
 
