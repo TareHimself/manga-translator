@@ -18,7 +18,7 @@ def get_color_detection_model(
 
     setattr(model, classifier, build_final_layer(in_features))  # Replace the final layer
 
-    if weights_path:
+    if weights_path is not None:
         model.load_state_dict(torch.load(weights_path))
 
     model.to(device)

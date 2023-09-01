@@ -4,7 +4,8 @@ import { EAppOperation, EImageFit } from "../types";
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import {
   performCurrentOperation,
-  setFontId,
+  setDrawerArgument,
+  setDrawerId,
   setImageAddress,
   setImageFit,
   setOcrArgument,
@@ -25,12 +26,13 @@ export default function ImageSettings() {
   const translators = useAppSelector((a) => a.app.translators);
   const ocrId = useAppSelector((a) => a.app.ocrId);
   const ocrs = useAppSelector((a) => a.app.ocrs);
-  const fontId = useAppSelector((a) => a.app.fontId);
-  const fonts = useAppSelector((a) => a.app.fonts);
+  const drawerId = useAppSelector((a) => a.app.drawerId);
+  const drawers = useAppSelector((a) => a.app.drawers);
   const imageAddress = useAppSelector((a) => a.app.originalImageAddress);
   const imageFit = useAppSelector((a) => a.app.imageFit);
   const ocrArgs = useAppSelector((a) => a.app.ocrArgs);
   const translatorArgs = useAppSelector((a) => a.app.translatorArgs);
+  const drawerArgs = useAppSelector((a) => a.app.drawerArgs);
 
   const [imageToLoad, setImageToLoad] = useState<string>("");
 
@@ -78,18 +80,6 @@ export default function ImageSettings() {
       {operation === EAppOperation.TRANSLATION && (
         <>
           <SelectTileRow
-            name="Font"
-            items={fonts.map((a, idx) => idx)}
-            value={fontId}
-            toSelectValue={(a) => `${a}`}
-            toOriginalValue={parseInt}
-            toLabel={(a) => fonts[a]?.name ?? "Loading"}
-            onSelected={(a) => {
-              dispatch(setFontId(a));
-            }}
-          />
-
-          <SelectTileRow
             name="Ocr"
             items={ocrs.map((a, idx) => idx)}
             value={ocrId}
@@ -131,6 +121,29 @@ export default function ImageSettings() {
               argsInfo={translators[translatorId].args}
               onArgumentUpdated={(idx, val) =>
                 dispatch(setTranslatorArgument({ index: idx, value: val }))
+              }
+            />
+          )}
+
+          <SelectTileRow
+            name="Drawer"
+            items={drawers.map((a, idx) => idx)}
+            value={drawerId}
+            toSelectValue={(a) => `${a}`}
+            toOriginalValue={parseInt}
+            toLabel={(a) => drawers[a]?.name ?? "Loading"}
+            onSelected={(a) => {
+              dispatch(setDrawerId(a));
+            }}
+          />
+
+          {drawerArgs.length > 0 && (
+            <ArgsTileColumn
+              category="Drawer"
+              args={drawerArgs}
+              argsInfo={drawers[drawerId].args}
+              onArgumentUpdated={(idx, val) =>
+                dispatch(setDrawerArgument({ index: idx, value: val }))
               }
             />
           )}

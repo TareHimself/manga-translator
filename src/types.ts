@@ -50,7 +50,7 @@ export const enum EImageFit {
 export interface IServerInfoResponse {
   translators: IServerItem[];
   ocr: IServerItem[];
-  fonts: IFontItem[];
+  drawers: IServerItem[];
 }
 
 export interface IImageSettings {
@@ -65,13 +65,14 @@ export interface IAppSliceState {
   convertedImageAddress: string;
   convertedImageLoading: boolean;
   translators: IServerItem[];
-  fonts: IFontItem[];
+  drawers: IServerItem[];
   ocrs: IServerItem[];
   translatorId: number;
   ocrId: number;
-  fontId: number;
+  drawerId: number;
   translatorArgs: IPluginArgumentInfo[];
   ocrArgs: IPluginArgumentInfo[];
+  drawerArgs: IPluginArgumentInfo[];
   operation: EAppOperation;
   imageFit: EImageFit;
 }
@@ -80,9 +81,10 @@ export interface IServerPayload {
   image: string;
   translator: number;
   ocr: number;
+  drawer: number;
   translatorArgs: Record<string, string>;
   ocrArgs: Record<string, string>;
-  font: number;
+  drawerArgs: Record<string, string>;
 }
 
 export type IAppStore = {

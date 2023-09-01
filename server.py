@@ -7,10 +7,11 @@ import numpy as np
 import asyncio
 from tornado.web import RequestHandler, Application
 from threading import Thread
-from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts, get_font_path_at_index
+from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts
 from translator.core.pipelines import FullConversion
 from translator.core.translators import get_translators
 from translator.core.ocr import get_ocr, CleanOcr
+from translator.core.drawers import get_drawers
 from PIL import Image
 import json
 import re
@@ -130,12 +131,12 @@ class TranslateFromWebHandler(RequestHandler):
 
             ocr_id, ocr_params = data.get('ocr', 0), data.get('ocrArgs', {})
 
-            font_id = data.get('font', 0)
+            drawer_id, drawer_params = data.get('drawer', 0), data.get('drawerArgs', {})
 
             image_cv2 = cv2_image_from_url(image_url)
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),
-                                       ocr=get_ocr()[ocr_id](**ocr_params), font_file=get_font_path_at_index(font_id))
+                                       ocr=get_ocr()[ocr_id](**ocr_params), drawer=get_drawers()[drawer_id](**drawer_params),color_detect_model=None)
 
             result = converter([image_cv2])[0]
 
@@ -191,7 +192,7 @@ class BaseHandler(RequestHandler):
 
     def get(self):
         try:
-            data = {"translators": [], "ocr": [], "fonts": get_fonts()}
+            data = {"translators": [], "ocr": [], "drawers": []}
 
             translators = get_translators()
 
@@ -211,6 +212,16 @@ class BaseHandler(RequestHandler):
                     "name": ocr[x].get_name(),
                     "description": ocr[x].__doc__,
                     "args": [x.get() for x in ocr[x].get_arguments()]
+                })
+
+            drawers = get_drawers()
+
+            for x in range(len(drawers)):
+                data["drawers"].append({
+                    "id": x,
+                    "name": drawers[x].get_name(),
+                    "description": drawers[x].__doc__,
+                    "args": [x.get() for x in drawers[x].get_arguments()]
                 })
             self.write(json.dumps(data))
         except:
