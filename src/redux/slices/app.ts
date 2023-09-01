@@ -28,10 +28,11 @@ const initialState: IAppSliceState = {
   translators: [],
   ocrId: 0,
   ocrs: [],
-  fontId: 0,
-  fonts: [],
+  drawerId: 0,
+  drawers: [],
   translatorArgs: [],
   ocrArgs: [],
+  drawerArgs: [],
   operation: EAppOperation.CLEANING,
   originalImageAddress: "",
   convertedImageAddress: "",
@@ -78,7 +79,8 @@ const performCurrentOperation = createAsyncThunk<
       ocr: state.ocrId,
       translatorArgs: state.translatorArgs.reduce(argsToPayloadReduce, {}),
       ocrArgs: state.ocrArgs.reduce(argsToPayloadReduce, {}),
-      font: state.fontId,
+      drawer: state.drawerId,
+      drawerArgs: state.drawerArgs.reduce(argsToPayloadReduce,{})
     };
 
     const serverAddress = state.serverAddress;
@@ -116,7 +118,7 @@ export const AppSlice = createSlice({
   reducers: {
     setTranslatorId: (state, action: PayloadAction<number>) => {
       state.translatorId = action.payload;
-      console.log("USING ARGS,",state.translators[action.payload].args)
+
       state.translatorArgs = toDefaultArgs(
         state.translators[action.payload].args
       );
@@ -125,8 +127,11 @@ export const AppSlice = createSlice({
       state.ocrId = action.payload;
       state.ocrArgs = toDefaultArgs(state.ocrs[action.payload].args);
     },
-    setFontId: (state, action: PayloadAction<number>) => {
-      state.fontId = action.payload;
+    setDrawerId: (state, action: PayloadAction<number>) => {
+      state.drawerId = action.payload;
+      state.drawerArgs = toDefaultArgs(
+        state.drawers[action.payload].args
+      );
     },
     setServerAddress: (state, action: PayloadAction<string>) => {
       state.originalImageAddress = action.payload;
@@ -160,6 +165,12 @@ export const AppSlice = createSlice({
     ) => {
       state.ocrArgs[action.payload.index].value = action.payload.value;
     },
+    setDrawerArgument: (
+      state,
+      action: PayloadAction<{ index: number; value: string }>
+    ) => {
+      state.drawerArgs[action.payload.index].value = action.payload.value;
+    },
   },
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   extraReducers: (builder) => {
@@ -167,14 +178,15 @@ export const AppSlice = createSlice({
       if (action.payload !== undefined) {
         state.translators = action.payload.translators;
         state.ocrs = action.payload.ocr;
-        state.fonts = action.payload.fonts;
+        state.drawers = action.payload.drawers;
         state.translatorId = 0;
         state.ocrId = 0;
-        state.fontId = 0;
+        state.drawerId = 0;
         state.translatorArgs = toDefaultArgs(
           state.translators[state.translatorId].args
         );
         state.ocrArgs = toDefaultArgs(state.ocrs[state.ocrId].args);
+        state.drawerArgs = toDefaultArgs(state.drawers[state.drawerId].args)
       }
     });
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -199,7 +211,7 @@ export const AppSlice = createSlice({
 export const {
   setTranslatorId,
   setOcrId,
-  setFontId,
+  setDrawerId,
   setServerAddress,
   setImageAddress,
   setSelectedOperation,
@@ -208,6 +220,7 @@ export const {
   setImageFit,
   setOcrArgument,
   setTranslatorArgument,
+  setDrawerArgument,
 } = AppSlice.actions;
 export { getServerInfo, performCurrentOperation };
 export default AppSlice.reducer;

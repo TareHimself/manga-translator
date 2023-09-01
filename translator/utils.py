@@ -34,7 +34,7 @@ def simplify_lang_code(code: str) -> Union[str, None]:
         return code
 
 def get_languages() -> list[tuple[str,str]]:
-    return filter(lambda a: a[1] is not None,list(map(lambda a : (a.name,getattr(a,'alpha_2',getattr(a,'alpha_3',None))),list(pycountry.languages))))
+    return list(filter(lambda a: a[1] is not None,list(map(lambda a : (a.name,getattr(a,'alpha_2',getattr(a,'alpha_3',None))),list(pycountry.languages)))))
 
 def lang_code_to_name(code: str) -> Union[str, None]:
     try:
@@ -504,7 +504,7 @@ def try_merge_hyphenated(text: list[str], max_chars: int):
 
 
 def wrap_text(text: str, max_chars: int, hyphenator: Union[Hyphenator, None]):
-    total = deque(text.split(" "))
+    total = deque(list(filter(lambda a: len(a.strip()) > 0,text.split(" "))))
     current_word = total.popleft()
     lines = []
     current_line = ""
@@ -558,22 +558,12 @@ def wrap_text(text: str, max_chars: int, hyphenator: Union[Hyphenator, None]):
     return try_merge_hyphenated(lines, max_chars)
 
 
-def get_fonts() -> list[str]:
+def get_fonts() -> list[tuple[str,str]]:
     fonts = []
-    idx = 0
     for file in filter(lambda a: a.endswith('.ttf'), os.listdir("./fonts")):
-        fonts.append({
-            "id": idx,
-            "name": file[0:-4]
-        })
-
-        idx += 1
+        fonts.append((file[0:-4],os.path.abspath(os.path.join('./fonts',file))))
 
     return fonts
-
-
-def get_font_path_at_index(idx: int):
-    return os.path.join("./fonts", list(filter(lambda a: a.endswith('.ttf'), os.listdir("./fonts")))[idx])
 
 
 def get_average_font_size(font: ImageFont, text="some text here"):
@@ -635,8 +625,8 @@ def color_diff(color1: np.ndarray, color2: np.ndarray):
 
 
 def draw_text_in_bubble(
-        frame,
-        bounds,
+        frame: np.ndarray,
+        bounds: tuple[int],
         text="",
         font_file="fonts/animeace2_reg.ttf",
         color=(0, 0, 0),

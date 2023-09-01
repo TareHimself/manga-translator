@@ -11,7 +11,7 @@ class OcrResult:
         self.language = language
 
 
-class BaseOcr(BasePlugin):
+class Ocr(BasePlugin):
     """Always outputs \"Sample\""""
 
     def __init__(self) -> None:
@@ -28,7 +28,7 @@ class BaseOcr(BasePlugin):
         return "Base Ocr"
 
 
-class CleanOcr(BaseOcr):
+class CleanOcr(Ocr):
     """Cleans The Image i.e. does nothing"""
 
     def __init__(self) -> None:
@@ -42,7 +42,7 @@ class CleanOcr(BaseOcr):
         return "Clean Ocr"
 
 
-class MangaOcr(BaseOcr):
+class MangaOcr(Ocr):
     """Only Supports Japanese"""
 
     def __init__(self) -> None:
@@ -59,7 +59,7 @@ class MangaOcr(BaseOcr):
         return "Manga Ocr"
 
 
-class EasyOcr(BaseOcr):
+class EasyOcr(Ocr):
     """Supports all the languages listed"""
 
     languages = [
@@ -175,7 +175,7 @@ class EasyOcr(BaseOcr):
                                      options=options, default=options[0].value)]
 
 
-class TesseractOcr(BaseOcr):
+class TesseractOcr(Ocr):
     """Supports all the languages listed"""
 
     default_language = "jpn"
@@ -189,6 +189,7 @@ class TesseractOcr(BaseOcr):
         self.language = language
 
     def do_ocr(self, text: numpy.ndarray):
+        print("Using Tesseract OCR")
         return OcrResult(text=self.tesseract.image_to_string(text, lang=self.language),
                          language=simplify_lang_code(self.language))
 
@@ -232,5 +233,5 @@ class TesseractOcr(BaseOcr):
         #                              options=options)]
 
 
-def get_ocr() -> list[BaseOcr]:
-    return list(filter(lambda a: a.is_valid(), [BaseOcr, CleanOcr, MangaOcr, EasyOcr, TesseractOcr]))
+def get_ocr() -> list[Ocr]:
+    return list(filter(lambda a: a.is_valid(), [Ocr, CleanOcr, MangaOcr, EasyOcr, TesseractOcr]))

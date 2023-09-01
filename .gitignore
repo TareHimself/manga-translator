@@ -33,4 +33,5 @@ yarn-error.log*
 manga-translator-service-account-data.json
 exa/*
 public/*
-trans.py
+local/*
+trans-test/*

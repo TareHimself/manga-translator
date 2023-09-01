@@ -11,16 +11,17 @@ from translator.utils import (
     TranslatorGlobals,
     in_paint_optimized,
     transform_sample,
-    has_white,
-    display_image
+    has_white
 )
 import traceback
 import threading
 import torch
+from typing import Union
 from concurrent.futures import ThreadPoolExecutor
 from translator.color_detect.models import get_color_detection_model
 from translator.core.translators import Translator
-from translator.core.ocr import BaseOcr
+from translator.core.ocr import Ocr
+from translator.core.drawers import HorizontalDrawer, Drawer
 
 
 # def inpaint(image, mask, radius=2, iterations=3):
@@ -45,12 +46,12 @@ def resize_percent(image, dest_percent=50):
 class FullConversion:
     def __init__(
             self,
-            detect_model="models/detection.pt",
-            seg_model="models/segmentation.pt",
-            color_detect_model="models/color_detection.pt",
-            translator=Translator(),
-            ocr=BaseOcr(),
-            font_file="fonts/animeace2_reg.ttf",
+            detect_model: str="models/detection.pt",
+            seg_model: str="models/segmentation.pt",
+            color_detect_model: Union[str,None] ="models/color_detection.pt",
+            translator: Translator =Translator(),
+            ocr:Ocr =Ocr(),
+            drawer:Drawer = HorizontalDrawer(),
             debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
@@ -68,8 +69,8 @@ class FullConversion:
 
         self.translator = translator
         self.ocr = ocr
+        self.drawer = drawer
         self.debug = debug
-        self.font_file = font_file
         self.frame_process_mutex = threading.Lock()
 
     def filter_results(self, results, min_confidence=0.1):
@@ -112,16 +113,20 @@ class FullConversion:
 
 
         start = time.time()
+
         frame_clean, text_mask = in_paint_optimized(
             frame,
             text_mask,
             detect_result,  # segmentation_results.boxes.xyxy.cpu().numpy()
         )
 
-        print(f"Initial Inpainting took {time.time() - start} seconds")
+        print(f"Inpainting => {time.time() - start} seconds")
 
         return frame, frame_clean, text_mask, detect_result
 
+    def get_translation(self,image_with_text,extra_data):
+        return (self.translator(self.ocr(image_with_text)),*extra_data)
+    
     def process_frame(self, detect_result, seg_result, frame):
         frame, frame_clean, text_mask, detect_result = self.process_ml_results(detect_result, seg_result, frame)
 
@@ -141,16 +146,7 @@ class FullConversion:
                 bubble = frame[y1:y2, x1:x2]
                 bubble_clean = frame_clean[y1:y2, x1:x2]
                 bubble_text_mask = text_mask[y1:y2, x1:x2]
-                # debug_image(frame[y1:y2, x1:x2], "FRAME")
-                # debug_image(text_mask[y1:y2, x1:x2], "text mask")
-                # inpainted = inpaint(
-                #     frame[y1:y2, x1:x2],
-                #     cv2.cvtColor(text_mask[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY),
-                #     3,
-                # )
-                # debug_image(inpainted, "Inpainted")
-                # # if len(bubble.shape) < 3:
-                # #     continue
+         
                 if has_white(bubble_text_mask):
                     text_only, bubble_mask = mask_text_and_make_bubble_mask(
                         bubble, bubble_text_mask, bubble_clean
@@ -158,7 +154,18 @@ class FullConversion:
 
                     frame[y1:y2, x1:x2] = bubble_clean
                     text_draw_bounds = get_bounds_for_text(bubble_mask)
-                    to_translate.append([bbox, bubble, text_only, text_draw_bounds])
+
+                    pt1,pt2 = text_draw_bounds
+
+                    pt1_x,pt1_y = pt1
+                    pt2_x,pt2_y = pt2
+
+                    pt1_x += x1
+                    pt2_x += x1
+                    pt1_y += y1
+                    pt2_y += y1
+
+                    to_translate.append([(pt1_x,pt1_y,pt2_x,pt2_y),text_only]) 
                     # debug_image(text_only,"Text Only")
             else:
                 frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
@@ -261,10 +268,10 @@ class FullConversion:
         # print("intersection found")
 
         # third pass, draw text
-        text_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
+        draw_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
 
         start = time.time()
-        if self.color_detect_model is not None and len(text_colors) > 0:
+        if self.color_detect_model is not None and len(draw_colors) > 0:
             with torch.no_grad():  # model needs work
                 with torch.inference_mode():
                     with self.frame_process_mutex:  # this may not be needed
@@ -276,83 +283,54 @@ class FullConversion:
                             # return cv2.dilate(frame,kernel,iterations = 1)
                             return frame
                         
-                        images = [fix_image(x[2].copy()) for x in to_translate]
+                        images = [fix_image(frame_with_text.copy()) for _,frame_with_text in to_translate]
                         # images = [x[2].copy() for x in to_translate]
                         # [display_image(x,"To Detect") for x in images]
                         
-                        text_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(
+                        draw_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(
                             torch.stack([transform_sample(y) for y in images]).to(torch.device("cuda:0")))]
         else:
-            print("Using black since color detect model is not valid")
+            print("Using black since color detect model is 'None'")
 
-        print(f"Color Detection took {time.time() - start} seconds")
+        print(f"Color Detection => {time.time() - start} seconds")
 
 
         start = time.time()
 
         to_draw = []
-        # for i in range(len(to_translate)):
-        #     bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
-        #     text_color = text_colors[i]
-        #     (x1, y1, x2, y2) = bbox
-
-        #     if self.translator and self.ocr:
-        #         # debug_image(text_as_image,"Item")
-        #         translation = self.translator(self.ocr, text_as_image)
-        #         if len(translation.strip()):
-        #             to_draw.append((bbox,bubble,text_draw_bounds,text_color,translation))
-
 
         if self.translator and self.ocr:
             with ThreadPoolExecutor(max_workers=len(to_translate)) as executor:
                 futures = []
 
-                def get_translation(translator,ocr,img,data):
-                    return translator(ocr, img),data
-
                 for i in range(len(to_translate)):
-                    bbox, bubble, text_as_image, text_draw_bounds = to_translate[i]
-                    text_color = text_colors[i]
-                    (x1, y1, x2, y2) = bbox
+                    bbox, frame_with_text = to_translate[i]
+                    draw_color = draw_colors[i]
 
-                    futures.append(executor.submit(get_translation,self.translator,self.ocr,text_as_image,(bbox,bubble,text_draw_bounds,text_color)))
+                    futures.append(executor.submit(self.get_translation,frame_with_text,(bbox,draw_color)))
 
 
                 for future in futures:
-                    translation,data = future.result()
-                    if len(translation.strip()):
-                            to_draw.append((*data,translation))
+                    to_draw.append(future.result())
+                            
                         
 
-        print(f"Fetching translations took {time.time() - start} seconds")
+        print(f"Ocr And Translation => {time.time() - start} seconds")
 
 
         start = time.time()
-        print(f"Drawing {len(to_draw)}")
-        for bbox,bubble,text_draw_bounds,text_color,translation in to_draw:
+        
+        for translation,bbox,draw_color in to_draw:
             (x1, y1, x2, y2) = bbox
-            print("Drawing TEXT",translation)
-            draw_surface = frame[y1:y2, x1:x2]
-            # draw_surface_color = get_average_color(draw_surface)
 
-            # if luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_BLACK) >= .7:
-            #     text_color = TranslatorGlobals.COLOR_BLACK
+            draw_frame = frame[y1:y2, x1:x2]
 
-            # elif luminance_similarity(np.array(text_color),TranslatorGlobals.COLOR_WHITE) >= .9:
-            #     text_color = TranslatorGlobals.COLOR_WHITE
+            outline_color = get_outline_color(draw_frame, draw_color)
 
-            outline_color = get_outline_color(draw_surface, text_color)
+            frame[y1:y2, x1:x2] = self.drawer(draw_color=draw_color,translation=translation,frame=draw_frame)
+            
 
-            # if outline_color is None:
-
-            #     print("Similarities",luminance_similarity(text_color,draw_surface_color))
-
-            frame[y1:y2, x1:x2] = draw_text_in_bubble(
-                bubble, text_draw_bounds, translation, font_file=self.font_file, color=text_color,
-                outline_color=outline_color
-            )
-
-        print(f"Drawing text took {time.time() - start} seconds")
+        print(f"Drawing => {time.time() - start} seconds")
         return frame
 
     def __call__(self, images: list[np.ndarray],
@@ -367,7 +345,7 @@ class FullConversion:
             ), images
         )]
 
-        print(f"Yolov8 Models took {time.time() - start} seconds")
+        print(f"Yolov8 Models => {time.time() - start} seconds")
 
         with ThreadPoolExecutor(max_workers=len(to_process)) as executor:
             futures = []
@@ -376,5 +354,5 @@ class FullConversion:
                 futures.append(executor.submit(self.process_frame, detect_result=detect_result, seg_result=seg_result,
                                                frame=frame))
             result = list(map(lambda a: a.result(), futures))
-            print(f"Total Process took {time.time() - total_start} seconds")
+            print(f"Total Process => {time.time() - total_start} seconds")
             return result

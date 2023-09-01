@@ -8,6 +8,7 @@ import numpy as np
 from translator.core.pipelines import FullConversion
 from translator.core.translators import get_translators
 from translator.core.ocr import get_ocr
+from translator.core.drawers import get_drawers
 
 EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
 
@@ -85,10 +86,10 @@ def run_live(tran: int, tran_args: str, ocr: int, ocr_args: str):
                     cv2.waitKey(1)
 
 
-def do_convert(files: list[str], tran: int, tran_args: str, ocr: int, ocr_args: str):
+def do_convert(files: list[str], translator: int, translator_args: str, ocr: int, ocr_args: str,drawer: int, drawer_args: str):
     converter = FullConversion(
-        translator=get_translators()[tran](**json_to_args(tran_args)),
-        ocr=get_ocr()[ocr](**json_to_args(ocr_args)),
+        translator=get_translators()[translator](**json_to_args(translator_args)),
+        ocr=get_ocr()[ocr](**json_to_args(ocr_args)),drawer=get_drawers()[drawer](**json_to_args(drawer_args)),
     )
     filenames = files
     batches = math.ceil(len(filenames) / 4)
@@ -150,7 +151,7 @@ def main():
 
     parser.add_argument(
         "-t",
-        "--tra",
+        "--translator",
         default=0,
         type=int,
         help="R|Set the index of the translator class to use. must be one of the following\n"
@@ -160,10 +161,29 @@ def main():
 
     parser.add_argument(
         "-ta",
-        "--tra-args",
+        "--translator-args",
         default="",
         type=str,
         help="Set translator class args i.e. 'key=value , key2=value'",
+        required=False,
+    )
+
+    parser.add_argument(
+        "-dr",
+        "--drawer",
+        default=0,
+        type=int,
+        help="R|Set the index of the drawer class to use. must be one of the following\n"
+             + convert_to_options_list(get_drawers()),
+        required=False,
+    )
+
+    parser.add_argument(
+        "-dra",
+        "--drawer-args",
+        default="",
+        type=str,
+        help="Set drawer class args i.e. 'key=value , key2=value'",
         required=False,
     )
 
@@ -182,18 +202,22 @@ def main():
                 if len(files) == 1 and os.path.isdir(files[0]):
                     do_convert(
                         [os.path.join(files[0], x) for x in os.listdir(files[0])],
-                        args.tra,
-                        args.tra_args,
+                        args.translator,
+                        args.translator_args,
                         args.ocr,
                         args.ocr_args,
+                        args.drawer,
+                        args.drawer_args,
                     )
                 else:
                     do_convert(
                         files,
-                        args.tra,
-                        args.tra_args,
+                        args.translator,
+                        args.translator_args,
                         args.ocr,
                         args.ocr_args,
+                        args.drawer,
+                        args.drawer_args,
                     )
 
 
