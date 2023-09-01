@@ -29,7 +29,6 @@
 - [x] Bubble Text ocr
 - [x] Bubble Text translation
 - [x] Bubble Text hypenation
-- [x] Ensure Repo works on M1
 - [x] Format and structure dataset
 - [x] Create converters i.e. yolo => coco, my dataset => yolo etc
 - [ ] Create Korean ocr model or finetune existing
