@@ -38,6 +38,7 @@
 - [ ] Improve text resize algorithm, some texts are too small/big
 
 ## Models
+
 - All current models are available for download [here](https://pixeldrain.com/l/9QGw78gR)
 
 ## Install
@@ -46,10 +47,12 @@
 - clone this repository
 - Open a terimal in the cloned repository
 - Run the following in the terminal to create an enviroment
+
 ```py
 conda create -n manga-translator python=3.9.12
 conda activate manga-translator
 ```
+
 - Install [Poetry](https://python-poetry.org/)
 - Run the following in the enviroment we created
 
@@ -58,17 +61,21 @@ poetry install
 poe install-deps
 # For cuda support run "poe force-cuda"
 ```
+
 - Download models to models/modelname (i.e. models/detection.py)
 - If you plan to use the UI also install [NodeJS](https://nodejs.org/en)
 
 ## Run
+
 ### UI
+
 ```bash
 poe build-ui
 poe run-server
 ```
 
 ### CLI
+
 ```bash
 python main.py -m [live|convert -f "files"]
 ```
@@ -89,11 +96,49 @@ python main.py -m [live|convert -f "files"]
 
 ## Examples
 
-<img src="examples/ja_a_certain_scientific_accelerator_1_001.png" width="500"/><img src="examples/ja_a_certain_scientific_accelerator_1_001_converted.png" width="500"/>
-
-<img src="examples/ja_one_punch_man_194.jpg" width="500"/><img src="examples/ja_one_punch_man_194_converted.jpg" width="500"/>
-
-<img src="examples/ja_oshi_no_ko_1_004.png" width="500"/><img src="examples/ja_oshi_no_ko_1_004_converted.png" width="500"/>
+<table>
+   <thead>
+      <tr>
+         <th align="center" width="50%">Original</th>
+         <th align="center" width="50%">Translated</th>
+      </tr>
+   </thead>
+   <tbody>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/ja_a_certain_scientific_accelerator_1_001.png" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/ja_a_certain_scientific_accelerator_1_001_converted.png" width="100%"/>
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => English</br>A Certain Scientific Accelerator</td>
+      </tr>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/ja_one_punch_man_194.jpg" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/ja_one_punch_man_194_converted.jpg" width="100%" />
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => English</br>One Punch Man</td>
+      </tr>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/ja_oshi_no_ko_1_004.png" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/ja_oshi_no_ko_1_004_converted.png" width="100%"/>
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => English</br>Oshi No Ko</td>
+      </tr>
+   </tbody>
+</table>
 
 ## Glossary
 

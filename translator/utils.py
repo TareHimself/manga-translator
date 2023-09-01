@@ -917,7 +917,7 @@ def transform_sample(cv2_image: np.ndarray, pad_img=True):
     if pad_img:
         height, width = image.shape[:2]
 
-        max_dim = max(height, width) + 50
+        max_dim = max(height, width) + 10
 
         # Calculate the amount of padding needed for each dimension
         pad_height = max_dim - height

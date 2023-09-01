@@ -4,6 +4,7 @@ import numpy as np
 import sys
 from ultralytics import YOLO
 from translator.utils import (
+    adjust_contrast_brightness,
     get_outline_color,
     mask_text_and_make_bubble_mask,
     draw_text_in_bubble,
@@ -275,13 +276,15 @@ class FullConversion:
             with torch.no_grad():  # model needs work
                 with torch.inference_mode():
                     with self.frame_process_mutex:  # this may not be needed
-                        def fix_image(frame):
-                            # frame = adjust_contrast_brightness(frame,contrast=2)
-                            # cv2.GaussianBlur(, (size_dil, size_dil), 0)
+                        def fix_image(img):
+                            # img = adjust_contrast_brightness(frame,contrast=2)
+                            # size_dil = 3
+                            # returncv2.GaussianBlur(img, (size_dil, size_dil), 0)
+
                             # final_mask_dilation = 6
                             # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
-                            # return cv2.dilate(frame,kernel,iterations = 1)
-                            return frame
+                            # return cv2.dilate(img,kernel,iterations = 1)
+                            return img
                         
                         images = [fix_image(frame_with_text.copy()) for _,frame_with_text in to_translate]
                         # images = [x[2].copy() for x in to_translate]

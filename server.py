@@ -9,8 +9,8 @@ from tornado.web import RequestHandler, Application
 from threading import Thread
 from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts
 from translator.core.pipelines import FullConversion
-from translator.core.translators import get_translators
-from translator.core.ocr import get_ocr, CleanOcr
+from translator.core.translators import get_translators,HuggingFace
+from translator.core.ocr import get_ocr, CleanOcr,MangaOcr
 from translator.core.drawers import get_drawers
 from PIL import Image
 import json
@@ -106,6 +106,9 @@ class CleanFromWebHandler(RequestHandler):
             self.set_status(500)
             traceback.print_exc()
             self.write(traceback.format_exc())
+
+
+
 
 
 class TranslateFromWebHandler(RequestHandler):
@@ -231,6 +234,50 @@ class BaseHandler(RequestHandler):
             traceback.print_exc()
 
 
+class MiraTranslateWebHandler(RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "*")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'image/png')
+
+    def options(self):
+        self.set_status(200)
+
+    @run_in_thread
+    def post(self):
+        try:
+            image = self.request.files['image'][0]
+
+            to_convert = pil_to_cv2(Image.open(io.BytesIO(image['body'])))
+
+            converter = FullConversion(color_detect_model=None,translator=HuggingFace(),ocr=MangaOcr())
+
+            translated = converter([to_convert])[0]
+
+            converted_pil = cv2_to_pil(translated)
+            img_byte_arr = io.BytesIO()
+            converted_pil.save(img_byte_arr, format="PNG")
+            # Create response given the bytes
+            self.write(img_byte_arr.getvalue())
+
+            # data = json.loads(self.request.body)
+
+            # image_url = data.get('image')
+
+            # image_cv2 = cv2_image_from_url(image_url)
+            # result = clean_image(image_cv2)
+            # converted_pil = cv2_to_pil(result)
+            # img_byte_arr = io.BytesIO()
+            # converted_pil.save(img_byte_arr, format="PNG")
+            # # Create response given the bytes
+            # self.write(img_byte_arr.getvalue())
+        except:
+            self.set_header("Content-Type", 'text/html')
+            self.set_status(500)
+            traceback.print_exc()
+            self.write(traceback.format_exc())
+
 class UiFilesHandler(RequestHandler):
 
     def initialize(self, build_path) -> None:
@@ -259,6 +306,7 @@ async def main():
         (r"/clean", CleanFromWebHandler),
         (r"/translate", TranslateFromWebHandler),
         (r"/images/.*", ImageHandler),
+        (r"/mira/translate", MiraTranslateWebHandler),
         (r"/(.*)", UiFilesHandler, dict(build_path=build_path)),
     ], **settings)
     app.listen(app_port)

@@ -3,6 +3,8 @@ from threading import Thread, Event
 from faker import Faker
 from tqdm import tqdm
 from torch.utils.data import Dataset
+from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
 import math
 from ..utils import generate_color_detection_train_example, transform_sample
 
@@ -23,27 +25,33 @@ class ColorDetectionDataset(Dataset):
         has_extra_backgrounds = len(backgrounds) > 0
         generator = random.Random(generator_seed)
 
-        faker_instances = [Faker(lang) for lang in self.languages]
+        faker_instances = [Faker(lang,use_weighting=False) for lang in self.languages]
         for x in faker_instances:
             x.seed_instance(generator_seed)
 
         num_fakers = len(faker_instances)
 
-        loader = tqdm(total=generate_target, desc="Generating Color Detection Dataset")
+        
         num_generated = 0
         stop_threads_event = Event()
 
+        faker_phrases = []
+
+        for i in tqdm(range(generate_target),desc="Generating Phrases"):
+            faker_index = (i + 1) % num_fakers
+
+            faker_phrases.append(" ".join([faker_instances[faker_index].name() for x in
+                                       range(generator.randint(1, 5))]))  # phrase is made up of names)
+        
+        loader = tqdm(total=generate_target, desc="Generating Samples")
+
         def make_sample(*items):
             nonlocal num_generated
-            for i in items:
+            for phrase in items:
                 if stop_threads_event.is_set():
                     break
 
-                faker_index = (i + 1) % num_fakers
-
-                phrase = " ".join([faker_instances[faker_index].name() for x in
-                                   range(generator.randint(1, 5))])  # phrase is made up of names
-
+                
                 example, label = generate_color_detection_train_example(phrase, background=generator.choice(
                     backgrounds) if has_extra_backgrounds else None, size=[
                     generator.randint(x, x + generator_size_delta) for x in generate_min_size],
@@ -53,15 +61,14 @@ class ColorDetectionDataset(Dataset):
 
                 # print(label,phrase)
                 # debug_image(example,"Generated sample")
-
-                self.examples.append(transform_sample(example).numpy())
+                # executor.submit(add_sample,label,example)
+                self.examples.append(example)
                 self.labels.append(label / 255)
                 loader.update()
                 num_generated += 1
 
-        target = list(range(generate_target))
-        amount_per_section = math.ceil(len(target) / num_workers)
-        sections = [target[x * amount_per_section:(x + 1) * amount_per_section] for x in range(num_workers)]
+        amount_per_section = math.ceil(len(faker_phrases) / num_workers)
+        sections = [faker_phrases[x * amount_per_section:(x + 1) * amount_per_section] for x in range(num_workers)]
 
         pending = [Thread(target=make_sample, daemon=True, group=None, args=section) for section in sections]
 
@@ -79,6 +86,14 @@ class ColorDetectionDataset(Dataset):
 
             if stop_threads_event.is_set():
                 break
+                
+
+        for i in tqdm(range(len(self.examples)),desc="Resizing Samples"):
+            self.examples[i] = transform_sample(self.examples[i]).numpy()
+            
+
+        
+                    
 
     def __getitem__(self, idx):
         return self.examples[idx], self.labels[idx]
