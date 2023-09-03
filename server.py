@@ -7,9 +7,9 @@ import numpy as np
 import asyncio
 from tornado.web import RequestHandler, Application
 from threading import Thread
-from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts
+from translator.utils import cv2_to_pil, pil_to_cv2, display_image
 from translator.core.pipelines import FullConversion
-from translator.core.translators import get_translators,HuggingFace
+from translator.core.translators import get_translators,DeepLTranslator
 from translator.core.ocr import get_ocr, CleanOcr,MangaOcr
 from translator.core.drawers import get_drawers
 from PIL import Image
@@ -17,6 +17,7 @@ import json
 import re
 import webbrowser
 import traceback
+import os
 
 
 def run_in_thread(func):
@@ -247,31 +248,29 @@ class MiraTranslateWebHandler(RequestHandler):
     @run_in_thread
     def post(self):
         try:
-            image = self.request.files['image'][0]
+           
+            image = self.request.files.get('file')
 
-            to_convert = pil_to_cv2(Image.open(io.BytesIO(image['body'])))
+            if image is None:
+                raise BaseException("No Image Sent")
 
-            converter = FullConversion(color_detect_model=None,translator=HuggingFace(),ocr=MangaOcr())
+            to_convert = pil_to_cv2(Image.open(io.BytesIO(image[0]['body'])))
+
+            converter = FullConversion(color_detect_model=None,translator=DeepLTranslator(auth_token=os.environ['DEEPL_AUTH']),ocr=MangaOcr())
 
             translated = converter([to_convert])[0]
 
+            # display_image(translated,"Translated")
             converted_pil = cv2_to_pil(translated)
+
             img_byte_arr = io.BytesIO()
+
             converted_pil.save(img_byte_arr, format="PNG")
             # Create response given the bytes
+            self.set_status(200)
+
             self.write(img_byte_arr.getvalue())
 
-            # data = json.loads(self.request.body)
-
-            # image_url = data.get('image')
-
-            # image_cv2 = cv2_image_from_url(image_url)
-            # result = clean_image(image_cv2)
-            # converted_pil = cv2_to_pil(result)
-            # img_byte_arr = io.BytesIO()
-            # converted_pil.save(img_byte_arr, format="PNG")
-            # # Create response given the bytes
-            # self.write(img_byte_arr.getvalue())
         except:
             self.set_header("Content-Type", 'text/html')
             self.set_status(500)
