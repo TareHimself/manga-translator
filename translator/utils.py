@@ -373,7 +373,7 @@ def in_paint_optimized(
         filtered: list,
         max_height: int = 256,
         max_width: int = 256,
-        mask_dilation_kernel_size: int = 9
+        mask_dilation_kernel_size: int = 6
 ):
     h, w, c = frame.shape
     max_height = int(math.floor(max_height / 8) * 8)
@@ -917,7 +917,7 @@ def transform_sample(cv2_image: np.ndarray, pad_img=True):
     if pad_img:
         height, width = image.shape[:2]
 
-        max_dim = max(height, width) + 50
+        max_dim = max(height, width) + 10
 
         # Calculate the amount of padding needed for each dimension
         pad_height = max_dim - height

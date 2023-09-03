@@ -7,16 +7,17 @@ import numpy as np
 import asyncio
 from tornado.web import RequestHandler, Application
 from threading import Thread
-from translator.utils import cv2_to_pil, pil_to_cv2, get_fonts
+from translator.utils import cv2_to_pil, pil_to_cv2, display_image
 from translator.core.pipelines import FullConversion
-from translator.core.translators import get_translators
-from translator.core.ocr import get_ocr, CleanOcr
+from translator.core.translators import get_translators,DeepLTranslator
+from translator.core.ocr import get_ocr, CleanOcr,MangaOcr
 from translator.core.drawers import get_drawers
 from PIL import Image
 import json
 import re
 import webbrowser
 import traceback
+import os
 
 
 def run_in_thread(func):
@@ -106,6 +107,9 @@ class CleanFromWebHandler(RequestHandler):
             self.set_status(500)
             traceback.print_exc()
             self.write(traceback.format_exc())
+
+
+
 
 
 class TranslateFromWebHandler(RequestHandler):
@@ -231,6 +235,48 @@ class BaseHandler(RequestHandler):
             traceback.print_exc()
 
 
+class MiraTranslateWebHandler(RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "*")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header("Content-Type", 'image/png')
+
+    def options(self):
+        self.set_status(200)
+
+    @run_in_thread
+    def post(self):
+        try:
+           
+            image = self.request.files.get('file')
+
+            if image is None:
+                raise BaseException("No Image Sent")
+
+            to_convert = pil_to_cv2(Image.open(io.BytesIO(image[0]['body'])))
+
+            converter = FullConversion(color_detect_model=None,translator=DeepLTranslator(auth_token=os.environ['DEEPL_AUTH']),ocr=MangaOcr())
+
+            translated = converter([to_convert])[0]
+
+            # display_image(translated,"Translated")
+            converted_pil = cv2_to_pil(translated)
+
+            img_byte_arr = io.BytesIO()
+
+            converted_pil.save(img_byte_arr, format="PNG")
+            # Create response given the bytes
+            self.set_status(200)
+
+            self.write(img_byte_arr.getvalue())
+
+        except:
+            self.set_header("Content-Type", 'text/html')
+            self.set_status(500)
+            traceback.print_exc()
+            self.write(traceback.format_exc())
+
 class UiFilesHandler(RequestHandler):
 
     def initialize(self, build_path) -> None:
@@ -259,6 +305,7 @@ async def main():
         (r"/clean", CleanFromWebHandler),
         (r"/translate", TranslateFromWebHandler),
         (r"/images/.*", ImageHandler),
+        (r"/mira/translate", MiraTranslateWebHandler),
         (r"/(.*)", UiFilesHandler, dict(build_path=build_path)),
     ], **settings)
     app.listen(app_port)
