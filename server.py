@@ -256,7 +256,7 @@ class MiraTranslateWebHandler(RequestHandler):
 
             to_convert = pil_to_cv2(Image.open(io.BytesIO(image[0]['body'])))
 
-            converter = FullConversion(color_detect_model=None,translator=DeepLTranslator(auth_token=os.environ['DEEPL_AUTH']),ocr=MangaOcr())
+            converter = FullConversion(color_detect_model=None,translator=DeepLTranslator(auth_token=os.environ['DEEPL_AUTH']),ocr=MangaOcr(),translate_free_text=True)
 
             translated = converter([to_convert])[0]
 

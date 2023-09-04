@@ -161,12 +161,9 @@ class OpenAiTranslator(Translator):
     MODELS = [
         ("GPT 3.5 Turbo","gpt-3.5-turbo"),
         ("GPT 4","gpt-4"),
-        ("GPT 4 0314","gpt-4-0314"),
-        ("GPT 4 32K","gpt-4-32k"),
-        ("GPT 4 32K 0314","gpt-4-32k-0314"),
-        ("GPT 3.5 Turbo 0301","gpt-3.5-turbo-0301"),
-        ("Text Davinci 003","text-davinci-003"),
-        ("Code Davinci 002","code-davinci-002")
+        ("GPT 4 0613","gpt-4-0613"),
+        ("GPT 3.5 Turbo 16K","gpt-3.5-turbo-16k"),
+        ("GPT 3.5 Turbo 0613","gpt-3.5-turbo-0613")
     ]
     
     def __init__(self, api_key="",target_lang = "en",model=MODELS[0][1],temp="0.2") -> None:

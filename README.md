@@ -31,10 +31,9 @@
 - [x] Bubble Text hypenation
 - [x] Format and structure dataset
 - [x] Create converters i.e. yolo => coco, my dataset => yolo etc
-- [ ] Create Korean ocr model or finetune existing
-- [ ] Create Chinese ocr model or finetune existing
-- [ ] Free text ocr
-- [ ] Free text translation
+- [ ] Better free text ocr
+- [ ] Better free text translation
+- [ ] Add more inpainting options i.e sd
 - [ ] Improve text resize algorithm, some texts are too small/big
 
 ## Models
@@ -106,10 +105,43 @@ python main.py -m [live|convert -f "files"]
    <tbody>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_a_certain_scientific_accelerator_1_001.png" width="100%"/>
+            <img alt="Original" src="examples/jujutsu_kaisen.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_a_certain_scientific_accelerator_1_001_converted.png" width="100%"/>
+            <img alt="Result" src="examples/jujutsu_kaisen_converted.png" width="100%"/>
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => English</br>Jujutsu Kaisen</td>
+      </tr>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/solo_leveling.png" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/solo_leveling_converted.png" width="100%"/>
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => "Meow"</br>Solo Leveling</td>
+      </tr>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/the_rising_of_the_sheild_hero.jpg" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/the_rising_of_the_sheild_hero_converted.jpg" width="100%"/>
+         </td>
+      </tr>
+      <tr>
+         <td colspan=2 align="center">Japanese => Clean</br>The Rising of the Shield Hero</td>
+      </tr>
+      <tr>
+         <td align="center" width="50%">
+            <img alt="Original" src="examples/ja_a_certain_scientific_accelerator.png" width="100%"/>
+         </td>
+         <td align="center" width="50%">
+            <img alt="Result" src="examples/ja_a_certain_scientific_accelerator_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>
@@ -117,10 +149,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_one_punch_man_194.jpg" width="100%"/>
+            <img alt="Original" src="examples/ja_one_punch_man.jpg" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_one_punch_man_194_converted.jpg" width="100%" />
+            <img alt="Result" src="examples/ja_one_punch_man_converted.jpg" width="100%" />
          </td>
       </tr>
       <tr>
@@ -128,10 +160,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_oshi_no_ko_1_004.png" width="100%"/>
+            <img alt="Original" src="examples/ja_oshi_no_ko.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_oshi_no_ko_1_004_converted.png" width="100%"/>
+            <img alt="Result" src="examples/ja_oshi_no_ko_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>

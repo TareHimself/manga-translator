@@ -92,8 +92,8 @@ class HorizontalDrawer(Drawer):
                 str(line),
                 fill=(*draw_color, 255),
                 font=font,
-                # stroke_width=outline if outline_color is not None else 0,
-                # stroke_fill=outline_color
+                stroke_width=2,
+                stroke_fill=(255,255,255)
             )
 
         return pil_to_cv2(frame_as_pil)

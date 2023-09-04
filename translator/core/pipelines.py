@@ -23,6 +23,7 @@ from translator.color_detect.models import get_color_detection_model
 from translator.core.translators import Translator
 from translator.core.ocr import Ocr
 from translator.core.drawers import HorizontalDrawer, Drawer
+from translator.core.cleaners import Cleaner, DeepFillV2Cleaner
 
 
 # def inpaint(image, mask, radius=2, iterations=3):
@@ -53,6 +54,8 @@ class FullConversion:
             translator: Translator =Translator(),
             ocr:Ocr =Ocr(),
             drawer:Drawer = HorizontalDrawer(),
+            cleaner: Cleaner = DeepFillV2Cleaner(),
+            translate_free_text: bool = False,
             debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
@@ -68,10 +71,12 @@ class FullConversion:
             self.color_detect_model = None
             traceback.print_exc()
 
+        self.translate_free_text = translate_free_text
         self.translator = translator
         self.ocr = ocr
         self.drawer = drawer
         self.debug = debug
+        self.cleaner = cleaner
         self.frame_process_mutex = threading.Lock()
 
     def filter_results(self, results, min_confidence=0.1):
@@ -115,11 +120,8 @@ class FullConversion:
 
         start = time.time()
 
-        frame_clean, text_mask = in_paint_optimized(
-            frame,
-            text_mask,
-            detect_result,  # segmentation_results.boxes.xyxy.cpu().numpy()
-        )
+
+        frame_clean, text_mask = self.cleaner(frame= frame, mask= text_mask, detection_results= detect_result) # segmentation_results.boxes.xyxy.cpu().numpy()
 
         print(f"Inpainting => {time.time() - start} seconds")
 
@@ -143,10 +145,12 @@ class FullConversion:
             (x1, y1, x2, y2) = bbox
 
             class_name = cls
+
+            bubble = frame[y1:y2, x1:x2]
+            bubble_clean = frame_clean[y1:y2, x1:x2]
+            bubble_text_mask = text_mask[y1:y2, x1:x2]
+
             if class_name == "text_bubble":
-                bubble = frame[y1:y2, x1:x2]
-                bubble_clean = frame_clean[y1:y2, x1:x2]
-                bubble_text_mask = text_mask[y1:y2, x1:x2]
          
                 if has_white(bubble_text_mask):
                     text_only, bubble_mask = mask_text_and_make_bubble_mask(
@@ -169,7 +173,18 @@ class FullConversion:
                     to_translate.append([(pt1_x,pt1_y,pt2_x,pt2_y),text_only]) 
                     # debug_image(text_only,"Text Only")
             else:
-                frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
+                if self.translate_free_text:
+                    free_text = frame[y1:y2, x1:x2]
+                    if has_white(free_text):
+                        text_only, _ = mask_text_and_make_bubble_mask(
+                            free_text, bubble_text_mask, bubble_clean
+                        )
+
+                        to_translate.append([(x1,y1,x2,y2),text_only])
+                           
+                    frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
+                else:
+                    frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
 
             if self.debug:
                 cv2.putText(
@@ -302,7 +317,8 @@ class FullConversion:
 
         to_draw = []
 
-        if self.translator and self.ocr:
+        
+        if self.translator and self.ocr and len(to_translate) > 0:
             with ThreadPoolExecutor(max_workers=len(to_translate)) as executor:
                 futures = []
 
