@@ -373,7 +373,7 @@ def in_paint_optimized(
         filtered: list,
         max_height: int = 256,
         max_width: int = 256,
-        mask_dilation_kernel_size: int = 6
+        mask_dilation_kernel_size: int = 9
 ):
     h, w, c = frame.shape
     max_height = int(math.floor(max_height / 8) * 8)
