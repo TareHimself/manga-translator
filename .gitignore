@@ -17,8 +17,6 @@ datasets/*
 # testing
 /coverage
 
-# production
-/build
 
 # misc
 .DS_Store
@@ -32,6 +30,5 @@ yarn-debug.log*
 yarn-error.log*
 manga-translator-service-account-data.json
 exa/*
-public/*
 local/*
 trans-test/*

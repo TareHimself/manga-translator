@@ -1,5 +1,4 @@
 import random
-from translator.inpainting import in_paint_threadsafe
 import cv2
 import json
 import os
@@ -10,10 +9,11 @@ import torch
 import threading
 import pycountry
 import numpy as np
+import PIL
 import PySimpleGUI as sg
 import largestinteriorrectangle as lir
 from torchvision import transforms
-from typing import Union
+from typing import Union, Callable
 from PIL import Image, ImageDraw, ImageFont
 from hyphen import Hyphenator
 from tqdm import tqdm
@@ -370,11 +370,12 @@ def mask_text_for_in_painting(frame: np.ndarray, mask: np.ndarray):
 def in_paint_optimized(
         frame: np.ndarray,
         mask: np.ndarray,
-        filtered: list,
+        filtered: list[tuple[tuple[int,int,int,int],str,float]] = [],
         max_height: int = 256,
         max_width: int = 256,
-        mask_dilation_kernel_size: int = 9
-):
+        mask_dilation_kernel_size: int = 9,
+        inpaint_fun: Callable[[np.ndarray,np.ndarray],np.ndarray] = lambda a, b : a
+) -> tuple[np.ndarray,np.ndarray]:
     h, w, c = frame.shape
     max_height = int(math.floor(max_height / 8) * 8)
     max_width = int(math.floor(max_width / 8) * 8)
@@ -457,20 +458,25 @@ def in_paint_optimized(
                                 target_region_x1:target_region_x2]
             section_to_refine_mask = region_mask[target_region_y1:target_region_y2, target_region_x1:target_region_x2]
 
+            # Generate a mask of the actual characters/text
             refined_mask = np.zeros_like(region_mask)
             refined_mask[target_region_y1:target_region_y2,
             target_region_x1:target_region_x2] = mask_text_for_in_painting(section_to_refine, section_to_refine_mask)
 
-            kernel = np.ones((mask_dilation_kernel_size, mask_dilation_kernel_size), np.uint8)
-            refined_mask = cv2.dilate(refined_mask, kernel, iterations=1)
-
-            final[y1:y2, x1:x2][target_region_y1:target_region_y2, target_region_x1:target_region_x2] = pil_to_cv2(
-                in_paint_threadsafe(cv2_to_pil(final[y1:y2, x1:x2]), cv2_to_pil(refined_mask))
-            )[target_region_y1:target_region_y2, target_region_x1:target_region_x2]
-
+            # The text mask is used for other stuff so we set it here before we dilate for inpainting
             text_mask[y1:y2, x1:x2][target_region_y1:target_region_y2,
             target_region_x1:target_region_x2] = refined_mask[target_region_y1:target_region_y2,
                                                  target_region_x1:target_region_x2].copy()
+            
+            # Dilate the text mask for inpainting
+            kernel = np.ones((mask_dilation_kernel_size, mask_dilation_kernel_size), np.uint8)
+            refined_mask = cv2.dilate(refined_mask, kernel, iterations=1)
+
+
+            # Inpaint using the dilated text mask
+            final[y1:y2, x1:x2][target_region_y1:target_region_y2, target_region_x1:target_region_x2] = inpaint_fun(final[y1:y2, x1:x2],refined_mask)[target_region_y1:target_region_y2, target_region_x1:target_region_x2]
+
+           
 
     return final, text_mask
 
@@ -564,6 +570,9 @@ def get_fonts() -> list[tuple[str,str]]:
         fonts.append((file[0:-4],os.path.abspath(os.path.join('./fonts',file))))
 
     return fonts
+
+def get_model_path(model = ""):
+    return os.path.join(os.path.abspath('./models'),model)
 
 
 def get_average_font_size(font: ImageFont, text="some text here"):

@@ -1,6 +1,6 @@
 # Manga Translator
 
-<img src="examples/ui.png"/>
+<img src="assets/examples/ui.png"/>
 
 ## Why ?
 
@@ -35,6 +35,7 @@
 - [ ] Better free text translation
 - [ ] Add more inpainting options i.e sd
 - [ ] Improve text resize algorithm, some texts are too small/big
+- [ ] Implement "https://github.com/advimman/lama" for cleaning
 
 ## Models
 
@@ -69,7 +70,6 @@ poe install-deps
 ### UI
 
 ```bash
-poe build-ui
 poe run-server
 ```
 
@@ -93,7 +93,7 @@ python main.py -m [live|convert -f "files"]
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
 
-## Examples
+## assets/examples
 
 <table>
    <thead>
@@ -105,10 +105,10 @@ python main.py -m [live|convert -f "files"]
    <tbody>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/jujutsu_kaisen.png" width="100%"/>
+            <img alt="Original" src="assets/examples/jujutsu_kaisen.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/jujutsu_kaisen_converted.png" width="100%"/>
+            <img alt="Result" src="assets/examples/jujutsu_kaisen_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>
@@ -116,10 +116,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/solo_leveling.png" width="100%"/>
+            <img alt="Original" src="assets/examples/solo_leveling.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/solo_leveling_converted.png" width="100%"/>
+            <img alt="Result" src="assets/examples/solo_leveling_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>
@@ -127,10 +127,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/the_rising_of_the_sheild_hero.jpg" width="100%"/>
+            <img alt="Original" src="assets/examples/the_rising_of_the_sheild_hero.jpg" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/the_rising_of_the_sheild_hero_converted.jpg" width="100%"/>
+            <img alt="Result" src="assets/examples/the_rising_of_the_sheild_hero_converted.jpg" width="100%"/>
          </td>
       </tr>
       <tr>
@@ -138,10 +138,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_a_certain_scientific_accelerator.png" width="100%"/>
+            <img alt="Original" src="assets/examples/ja_a_certain_scientific_accelerator.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_a_certain_scientific_accelerator_converted.png" width="100%"/>
+            <img alt="Result" src="assets/examples/ja_a_certain_scientific_accelerator_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>
@@ -149,10 +149,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_one_punch_man.jpg" width="100%"/>
+            <img alt="Original" src="assets/examples/ja_one_punch_man.jpg" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_one_punch_man_converted.jpg" width="100%" />
+            <img alt="Result" src="assets/examples/ja_one_punch_man_converted.jpg" width="100%" />
          </td>
       </tr>
       <tr>
@@ -160,10 +160,10 @@ python main.py -m [live|convert -f "files"]
       </tr>
       <tr>
          <td align="center" width="50%">
-            <img alt="Original" src="examples/ja_oshi_no_ko.png" width="100%"/>
+            <img alt="Original" src="assets/examples/ja_oshi_no_ko.png" width="100%"/>
          </td>
          <td align="center" width="50%">
-            <img alt="Result" src="examples/ja_oshi_no_ko_converted.png" width="100%"/>
+            <img alt="Result" src="assets/examples/ja_oshi_no_ko_converted.png" width="100%"/>
          </td>
       </tr>
       <tr>
