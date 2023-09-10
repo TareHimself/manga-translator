@@ -5,10 +5,10 @@ import os
 import math
 import re
 import numpy as np
-from translator.core.pipelines import FullConversion
-from translator.core.translators import get_translators
-from translator.core.ocr import get_ocr
-from translator.core.drawers import get_drawers
+from translator.pipelines import FullConversion
+from translator.translators.get import get_translators
+from translator.ocr.get import get_ocr
+from translator.drawers.get import get_drawers
 
 EXTENSION_REGEX = r".*\.([a-zA-Z0-9]+)"
 

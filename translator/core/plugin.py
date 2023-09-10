@@ -1,5 +1,4 @@
-from typing import Union
-
+import numpy as np
 
 class PluginArgumentType:
     TEXT = 0
@@ -70,3 +69,68 @@ class BasePlugin:
     @staticmethod
     def is_valid() -> bool:
         return True
+
+class OcrResult:
+    def __init__(self, text: str = "", language: str = "en") -> None:
+        self.text = text
+        self.language = language
+
+
+class Ocr(BasePlugin):
+    """Always outputs \"Sample\""""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, text: np.ndarray) -> OcrResult:
+        return self.do_ocr(text)
+
+    def do_ocr(self, text: np.ndarray):
+        return OcrResult("Sample")
+
+    @staticmethod
+    def get_name() -> str:
+        return "Base Ocr"
+
+class TranslatorResult():
+    def __init__(self,text:str = '',lang_code: str = 'en') -> None:
+        self.lang_code = lang_code
+        self.text = text
+
+class Translator(BasePlugin):
+    """Base Class for all Translator classes"""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, ocr_result: OcrResult) -> str:
+        return self.translate(ocr_result)
+
+    def translate(self, ocr_result: OcrResult) -> TranslatorResult:
+        return TranslatorResult(ocr_result.text)
+
+    @staticmethod
+    def get_name() -> str:
+        return "Base Translator"
+    
+
+class Drawer(BasePlugin):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def draw(self,draw_color:np.ndarray,translation: TranslatorResult,frame: np.ndarray) -> np.ndarray:
+        return frame
+    
+    def __call__(self, draw_color:np.ndarray,translation: TranslatorResult,frame: np.ndarray) -> np.ndarray:
+        return self.draw(draw_color=draw_color,translation=translation,frame=frame)
+    
+
+class Cleaner(BasePlugin):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def clean(self,frame: np.ndarray,mask: np.ndarray,detection_results: list[tuple[tuple[int,int,int,int],str,float]] = []) -> tuple[np.ndarray,np.ndarray]:
+        return frame
+    
+    def __call__(self,frame: np.ndarray,mask: np.ndarray,detection_results: list[tuple[tuple[int,int,int,int],str,float]] = []) -> tuple[np.ndarray,np.ndarray]:
+        return self.clean(frame=frame,mask=mask,detection_results=detection_results)

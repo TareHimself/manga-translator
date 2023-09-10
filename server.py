@@ -7,11 +7,15 @@ import numpy as np
 import asyncio
 from tornado.web import RequestHandler, Application
 from threading import Thread
-from translator.utils import cv2_to_pil, pil_to_cv2, display_image
-from translator.core.pipelines import FullConversion
-from translator.core.translators import get_translators,DeepLTranslator
-from translator.core.ocr import get_ocr, CleanOcr,MangaOcr
-from translator.core.drawers import get_drawers
+from translator.utils import cv2_to_pil, pil_to_cv2
+from translator.pipelines import FullConversion
+from translator.translators.get import get_translators
+from translator.translators.deepl import DeepLTranslator
+from translator.ocr.get import get_ocr
+from translator.ocr.clean import CleanOcr
+from translator.ocr.manga import MangaOcr
+from translator.drawers.get import get_drawers
+from translator.cleaners.get import get_cleaners
 from PIL import Image
 import json
 import re
@@ -35,10 +39,6 @@ def run_in_thread(func):
 
     return wrapper
 
-
-def clean_image(image: np.ndarray):
-    converter = FullConversion(ocr=CleanOcr())
-    return converter([image])[0]
 
 
 def cv2_image_from_url(url: str):
@@ -94,9 +94,9 @@ class CleanFromWebHandler(RequestHandler):
             data = json.loads(self.request.body)
 
             image_url = data.get('image')
-
+            cleaner_id, cleaner_params = data.get('cleaner', 0), data.get('cleanerArgs', {})
             image_cv2 = cv2_image_from_url(image_url)
-            result = clean_image(image_cv2)
+            result = FullConversion(ocr=CleanOcr(),cleaner=get_cleaners()[cleaner_id](**cleaner_params))([image_cv2])[0]
             converted_pil = cv2_to_pil(result)
             img_byte_arr = io.BytesIO()
             converted_pil.save(img_byte_arr, format="PNG")
@@ -137,10 +137,12 @@ class TranslateFromWebHandler(RequestHandler):
 
             drawer_id, drawer_params = data.get('drawer', 0), data.get('drawerArgs', {})
 
+            cleaner_id, cleaner_params = data.get('cleaner', 0), data.get('cleanerArgs', {})
+
             image_cv2 = cv2_image_from_url(image_url)
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),
-                                       ocr=get_ocr()[ocr_id](**ocr_params), drawer=get_drawers()[drawer_id](**drawer_params),color_detect_model=None)
+                                       ocr=get_ocr()[ocr_id](**ocr_params), drawer=get_drawers()[drawer_id](**drawer_params),cleaner=get_cleaners()[cleaner_id](**cleaner_params),color_detect_model=None)
 
             result = converter([image_cv2])[0]
 
@@ -196,7 +198,7 @@ class BaseHandler(RequestHandler):
 
     def get(self):
         try:
-            data = {"translators": [], "ocr": [], "drawers": []}
+            data = {"translators": [], "ocr": [], "drawers": [], "cleaners": []}
 
             translators = get_translators()
 
@@ -226,6 +228,16 @@ class BaseHandler(RequestHandler):
                     "name": drawers[x].get_name(),
                     "description": drawers[x].__doc__,
                     "args": [x.get() for x in drawers[x].get_arguments()]
+                })
+
+            cleaners = get_cleaners()
+
+            for x in range(len(cleaners)):
+                data["cleaners"].append({
+                    "id": x,
+                    "name": cleaners[x].get_name(),
+                    "description": cleaners[x].__doc__,
+                    "args": [x.get() for x in cleaners[x].get_arguments()]
                 })
             self.write(json.dumps(data))
         except:
@@ -294,7 +306,7 @@ class UiHandler(RequestHandler):
 
 async def main():
     app_port = 5000
-    build_path = os.path.join(os.path.dirname(__file__), "build")
+    build_path = os.path.join(os.path.dirname(__file__),'ui', "build")
     settings = {
         "template_path": build_path,
         "static_path": os.path.join(build_path, 'static'),
