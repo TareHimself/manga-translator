@@ -338,9 +338,9 @@ async def main():
         (r"/info", BaseHandler),
         (r"/clean", CleanFromWebHandler),
         (r"/translate", TranslateFromWebHandler),
-        (r"/images/.*", ImageHandler),
+        # (r"/images/.*", ImageHandler),
         (r"/mira/translate", MiraTranslateWebHandler),
-        (r"/(.*)", UiFilesHandler, dict(build_path=build_path)),
+        # (r"/(.*)", UiFilesHandler, dict(build_path=build_path)),
     ], **settings)
     app.listen(app_port)
     webbrowser.open(f'http://localhost:{app_port}')
