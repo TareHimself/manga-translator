@@ -1,6 +1,13 @@
-
 import os
-from translator.core.plugin import  Translator,TranslatorResult,OcrResult, PluginArgument, PluginTextArgument,PluginSelectArgument, PluginSelectArgumentOption
+from translator.core.plugin import (
+    Translator,
+    TranslatorResult,
+    OcrResult,
+    PluginArgument,
+    PluginTextArgument,
+    PluginSelectArgument,
+    PluginSelectArgumentOption,
+)
 
 
 class GoogleTranslateTranslator(Translator):
@@ -20,21 +27,30 @@ class GoogleTranslateTranslator(Translator):
         else:
             self.trans = None
 
-    def translate(self, ocr_result: OcrResult):
-        if self.trans is None :
+    async def translate(self, ocr_result: OcrResult):
+        if self.trans is None:
             return TranslatorResult("Invalid Key Path")
-        
+
         if len(ocr_result.text.strip()) == 0:
             return TranslatorResult()
 
-        return TranslatorResult(self.trans.translate(
-            ocr_result.text, source_language=ocr_result.language, target_language="en"
-        )["translatedText"])
+        return TranslatorResult(
+            self.trans.translate(
+                ocr_result.text,
+                source_language=ocr_result.language,
+                target_language="en",
+            )["translatedText"]
+        )
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="key_path", name="Service Account Key Path",
-                                   description="Path to google application credentials json")]
+        return [
+            PluginTextArgument(
+                id="key_path",
+                name="Service Account Key Path",
+                description="Path to google application credentials json",
+            )
+        ]
 
     @staticmethod
     def get_name() -> str:

@@ -5,11 +5,7 @@ import { EImageFit } from "../types";
 
 export default function ImageConverter() {
   const dispatch = useAppDispatch();
-  const originalImageAddress = useAppSelector((a) =>
-    a.app.originalImageAddress.length == 0
-      ? ""
-      : a.app.serverAddress + "/images/" + a.app.originalImageAddress
-  );
+  const originalImageAddress = useAppSelector((a) => a.app.originalImageAddress);
   const convertedImageAddress = useAppSelector(
     (a) => a.app.convertedImageAddress
   );

@@ -1,5 +1,11 @@
+from translator.core.plugin import (
+    Translator,
+    TranslatorResult,
+    OcrResult,
+    PluginTextArgument,
+    PluginArgument,
+)
 
-from translator.core.plugin import Translator, TranslatorResult, OcrResult, PluginTextArgument, PluginArgument
 
 class DebugTranslator(Translator):
     """Writes the specified text"""
@@ -8,7 +14,7 @@ class DebugTranslator(Translator):
         super().__init__()
         self.to_write = text
 
-    def translate(self, ocr_result: OcrResult):
+    async def translate(self, ocr_result: OcrResult):
         return TranslatorResult(self.to_write)
 
     @staticmethod
@@ -17,4 +23,8 @@ class DebugTranslator(Translator):
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        return [PluginTextArgument(id="text", name="Debug Text", description="What to write")]
+        return [
+            PluginTextArgument(
+                id="text", name="Debug Text", description="What to write"
+            )
+        ]

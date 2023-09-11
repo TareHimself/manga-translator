@@ -39,6 +39,21 @@ def run_in_thread(func):
 
     return wrapper
 
+def run_in_thread(func):
+    async def wrapper(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        pending_task = asyncio.Future()
+
+        def run_task():
+            nonlocal loop
+            loop.call_soon_threadsafe(pending_task.set_result, func(*args, **kwargs))
+
+        Thread(target=run_task, group=None, daemon=True).start()
+        result = await pending_task
+        return result
+
+    return wrapper
+
 
 
 def cv2_image_from_url(url: str):
@@ -88,16 +103,22 @@ class CleanFromWebHandler(RequestHandler):
     def options(self):
         self.set_status(200)
 
-    @run_in_thread
-    def post(self):
+    async def post(self):
         try:
-            data = json.loads(self.request.body)
 
-            image_url = data.get('image')
+            image = self.request.files.get('file')
+
+            if image is None:
+                raise BaseException("No Image Sent")
+
+            data = json.loads(self.get_argument('data'))
+
+
             cleaner_id, cleaner_params = data.get('cleaner', 0), data.get('cleanerArgs', {})
-            image_cv2 = cv2_image_from_url(image_url)
-            result = FullConversion(ocr=CleanOcr(),cleaner=get_cleaners()[cleaner_id](**cleaner_params))([image_cv2])[0]
-            converted_pil = cv2_to_pil(result)
+            image_cv2 = pil_to_cv2(Image.open(io.BytesIO(image[0]['body'])))
+            converter = FullConversion(ocr=CleanOcr(),cleaner=get_cleaners()[cleaner_id](**cleaner_params))
+            results = await converter([image_cv2])
+            converted_pil = cv2_to_pil(results[0])
             img_byte_arr = io.BytesIO()
             converted_pil.save(img_byte_arr, format="PNG")
             # Create response given the bytes
@@ -123,13 +144,15 @@ class TranslateFromWebHandler(RequestHandler):
     def options(self):
         self.set_status(200)
 
-    @run_in_thread
-    def post(self):
+    async def post(self):
         try:
 
-            data = json.loads(self.request.body)
+            image = self.request.files.get('file')
 
-            image_url = data.get('image')
+            if image is None:
+                raise BaseException("No Image Sent")
+
+            data = json.loads(self.get_argument('data'))
 
             translator_id, translator_params = data.get('translator', 0), data.get('translatorArgs', {})
 
@@ -139,14 +162,14 @@ class TranslateFromWebHandler(RequestHandler):
 
             cleaner_id, cleaner_params = data.get('cleaner', 0), data.get('cleanerArgs', {})
 
-            image_cv2 = cv2_image_from_url(image_url)
+            image_cv2 = pil_to_cv2(Image.open(io.BytesIO(image[0]['body'])))
 
             converter = FullConversion(translator=get_translators()[translator_id](**translator_params),
                                        ocr=get_ocr()[ocr_id](**ocr_params), drawer=get_drawers()[drawer_id](**drawer_params),cleaner=get_cleaners()[cleaner_id](**cleaner_params),color_detect_model=None)
 
-            result = converter([image_cv2])[0]
+            results = await converter([image_cv2])
 
-            converted_pil = cv2_to_pil(result)
+            converted_pil = cv2_to_pil(results[0])
             img_byte_arr = io.BytesIO()
             converted_pil.save(img_byte_arr, format="PNG")
             # Create response given the bytes
@@ -257,8 +280,7 @@ class MiraTranslateWebHandler(RequestHandler):
     def options(self):
         self.set_status(200)
 
-    @run_in_thread
-    def post(self):
+    async def post(self):
         try:
            
             image = self.request.files.get('file')
@@ -270,10 +292,10 @@ class MiraTranslateWebHandler(RequestHandler):
 
             converter = FullConversion(color_detect_model=None,translator=DeepLTranslator(auth_token=os.environ['DEEPL_AUTH']),ocr=MangaOcr(),translate_free_text=True)
 
-            translated = converter([to_convert])[0]
+            translated = await converter([to_convert])
 
             # display_image(translated,"Translated")
-            converted_pil = cv2_to_pil(translated)
+            converted_pil = cv2_to_pil(translated[0])
 
             img_byte_arr = io.BytesIO()
 

@@ -36,9 +36,9 @@ code {
   flex: 1 1;
   height: 100%;
   align-items: center;
-  justify-content: center;
+  /* justify-content: center; */
   flex-direction: column;
-  gap: 30px;
+  gap: 20px;
   overflow-y: scroll;
 }
 
@@ -102,10 +102,10 @@ code {
 
 .tile-row {
   display: flex;
-  width: 80%;
+  width: 60%;
   height: -moz-fit-content;
   height: fit-content;
-  gap: 10px;
+  gap: 5px;
   flex-direction: column;
   box-sizing: border-box;
 }
@@ -114,6 +114,7 @@ code {
   color: white;
   margin: 0px;
   font-size: 15px;
+  text-align: center;
 }
 
 .tile-row-content {
@@ -122,12 +123,11 @@ code {
   height: 30px;
   align-items: center;
   gap: 20px;
-
 }
 
 .tile-row-content input[type="text"] {
   height: 100%;
-  width: 60%;
+  width: 100%;
   padding: 0px 5px;
   border: 0px;
   border-radius: 5px;
@@ -137,28 +137,37 @@ code {
 .tile-row svg {
   font-size: 28px;
   transition: all ease-in-out 0.2s;
-  cursor: pointer;
-}
-
-.tile-row svg:hover {
-  transform: scale(1.1);
+  color: #222222;
 }
 
 .tile-row-content select {
   height: 100%;
-  width: 60%;
+  width: 100%;
   border-radius: 5px;
 }
 
 .tile-row-content button {
+  background-color: white;
   margin-top: 40px;
   cursor: pointer;
   height: 100%;
-  width: 60%;
+  width: 100%;
   border-radius: 5px;
   transition: all ease-in-out 0.2s;
+  border: none;
 }
 
 .tile-row-content button:hover {
   border-radius: 20px;
+}
+
+/* .tile-row-content button:hover svg {
+  transform: scale(1.1);
+} */
+
+.tile-row-content .upload{
+  border: none;
+  padding: 0px;
+  margin: 0px;
+  flex: 1;
 }

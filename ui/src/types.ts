@@ -83,7 +83,6 @@ export interface IAppSliceState {
 }
 
 export interface IServerPayload {
-  image: string;
   translator: number;
   ocr: number;
   drawer: number;
