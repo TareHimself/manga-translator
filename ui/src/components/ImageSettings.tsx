@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useId } from "react";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { EAppOperation, EImageFit } from "../types";
-import { AiOutlineCloudUpload } from "react-icons/ai";
+import { FaFileUpload } from "react-icons/fa";
 import {
   performCurrentOperation,
   setCleanerArgument,
@@ -32,29 +32,55 @@ export default function ImageSettings() {
   const drawers = useAppSelector((a) => a.app.drawers);
   const cleanerId = useAppSelector((a) => a.app.cleanerId);
   const cleaners = useAppSelector((a) => a.app.cleaners);
-  const imageAddress = useAppSelector((a) => a.app.originalImageAddress);
   const imageFit = useAppSelector((a) => a.app.imageFit);
   const ocrArgs = useAppSelector((a) => a.app.ocrArgs);
   const translatorArgs = useAppSelector((a) => a.app.translatorArgs);
   const drawerArgs = useAppSelector((a) => a.app.drawerArgs);
   const cleanerArgs = useAppSelector((a) => a.app.cleanerArgs);
 
-  const [imageToLoad, setImageToLoad] = useState<string>("");
+  const inputElementId = useId()
 
   return (
     <div className="tile">
-      <TileRow name="Image Address Or Path">
-        <input
+      <TileRow name="Upload Image" style={{height: 60}}>
+        {/* <input
           value={imageToLoad}
           type="text"
           onChange={(e) => setImageToLoad(e.target.value)}
+        /> */}
+        <input
+          id={inputElementId}
+          type='file'
+          onChange={(e) => {
+            const result = e.target.files?.item(0) 
+            if(result instanceof Blob){
+              dispatch(setImageAddress(URL.createObjectURL(result)))
+            }
+          }}
+          style={{display: 'none'}}
+          accept="image/*"
         />
-        <AiOutlineCloudUpload
-          color="white"
-          onClick={() =>
-            dispatch(setImageAddress(encodeURI(imageToLoad.trim())))
-          }
-        />
+        <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', gap: "20px"}}>
+        <button
+        className="upload"
+        onClick={() =>
+          document.getElementById(inputElementId)?.click()
+        }
+        >
+        <FaFileUpload/>
+        </button>
+        {/* <button
+        className="upload"
+        onClick={() =>
+          navigator.clipboard.readText().then((a) => {
+            dispatch(setImageAddress(a.trim()))
+          })
+        }
+        >
+        <FaPaste/>
+        </button> */}
+        </div>
+        
       </TileRow>
 
       <SelectTileRow
@@ -181,17 +207,6 @@ export default function ImageSettings() {
         <div className="tile-row-content">
           <button
             onClick={() => {
-              const currentAddressInUiEncoded = encodeURI(imageToLoad.trim());
-
-              if (currentAddressInUiEncoded.length === 0) {
-                dispatch(setImageAddress(""));
-                return;
-              }
-
-              if (currentAddressInUiEncoded != imageAddress) {
-                dispatch(setImageAddress(currentAddressInUiEncoded));
-              }
-
               dispatch(performCurrentOperation());
             }}
           >

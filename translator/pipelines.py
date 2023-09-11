@@ -10,15 +10,16 @@ from translator.utils import (
     TranslatorGlobals,
     transform_sample,
     has_white,
-    get_model_path
+    get_model_path,
 )
 import traceback
 import threading
 import torch
+import asyncio
 from typing import Union
 from concurrent.futures import ThreadPoolExecutor
 from translator.color_detect.models import get_color_detection_model
-from translator.core.plugin import Translator,Ocr, Drawer, Cleaner
+from translator.core.plugin import Translator, Ocr, Drawer, Cleaner
 from translator.cleaners.deepfillv2 import DeepFillV2Cleaner
 from translator.drawers.horizontal import HorizontalDrawer
 
@@ -36,6 +37,7 @@ from translator.drawers.horizontal import HorizontalDrawer
 
 TranslatorGlobals.COLOR_BLACK
 
+
 def resize_percent(image, dest_percent=50):
     width = int(image.shape[1] * dest_percent / 100)
     height = int(image.shape[0] * dest_percent / 100)
@@ -45,23 +47,24 @@ def resize_percent(image, dest_percent=50):
 
 class FullConversion:
     def __init__(
-            self,
-            detect_model: str=get_model_path("detection.pt"),
-            seg_model: str=get_model_path("segmentation.pt"),
-            color_detect_model: Union[str,None] =get_model_path("color_detection.pt"),
-            translator: Translator =Translator(),
-            ocr:Ocr =Ocr(),
-            drawer:Drawer = HorizontalDrawer(),
-            cleaner: Cleaner = DeepFillV2Cleaner(),
-            translate_free_text: bool = False,
-            debug=False,
+        self,
+        detect_model: str = get_model_path("detection.pt"),
+        seg_model: str = get_model_path("segmentation.pt"),
+        color_detect_model: Union[str, None] = get_model_path("color_detection.pt"),
+        translator: Translator = Translator(),
+        ocr: Ocr = Ocr(),
+        drawer: Drawer = HorizontalDrawer(),
+        cleaner: Cleaner = DeepFillV2Cleaner(),
+        translate_free_text: bool = False,
+        debug=False,
     ) -> None:
         self.segmentation_model = YOLO(seg_model)
         self.detection_model = YOLO(detect_model)
         try:
             if color_detect_model is not None:
-                self.color_detect_model = get_color_detection_model(weights_path=color_detect_model,
-                                                                device=torch.device("cuda:0"))
+                self.color_detect_model = get_color_detection_model(
+                    weights_path=color_detect_model, device=torch.device("cuda:0")
+                )
                 self.color_detect_model.eval()
             else:
                 self.color_detect_model = None
@@ -84,8 +87,8 @@ class FullConversion:
 
         confidence = np.array(results.boxes.conf.cpu(), dtype="float")
 
-        filtered: list[tuple[tuple[int,int,int,int],str,float]] = []
-        
+        filtered: list[tuple[tuple[int, int, int, int], str, float]] = []
+
         for box, obj_class, conf in zip(bounding_boxes, classes, confidence):
             if conf >= min_confidence:
                 has_similar = False
@@ -100,13 +103,11 @@ class FullConversion:
 
         return filtered
 
-    def process_ml_results(self, detect_result, seg_result, frame):
+    async def process_ml_results(self, detect_result, seg_result, frame):
         text_mask = np.zeros_like(frame, dtype=frame.dtype)
 
         if seg_result.masks is not None:  # Fill in segmentation results
-            for seg in list(
-                    map(lambda a: a.astype("int"), seg_result.masks.xy)
-            ):
+            for seg in list(map(lambda a: a.astype("int"), seg_result.masks.xy)):
                 cv2.fillPoly(text_mask, [seg], (255, 255, 255))
 
         detect_result = self.filter_results(detect_result)
@@ -114,23 +115,27 @@ class FullConversion:
         for bbox, cls, conf in detect_result:  # fill in text free results
             if cls == "text_free":
                 (x1, y1, x2, y2) = bbox
-                text_mask = cv2.rectangle(text_mask, (x1, y1), (x2, y2), (255, 255, 255), -1)
-
+                text_mask = cv2.rectangle(
+                    text_mask, (x1, y1), (x2, y2), (255, 255, 255), -1
+                )
 
         start = time.time()
 
-
-        frame_clean, text_mask = self.cleaner(frame= frame, mask= text_mask, detection_results= detect_result) # segmentation_results.boxes.xyxy.cpu().numpy()
+        frame_clean, text_mask = await self.cleaner(
+            frame=frame, mask=text_mask, detection_results=detect_result
+        )  # segmentation_results.boxes.xyxy.cpu().numpy()
 
         print(f"Inpainting => {time.time() - start} seconds")
 
         return frame, frame_clean, text_mask, detect_result
 
-    def get_translation(self,image_with_text,extra_data):
-        return (self.translator(self.ocr(image_with_text)),*extra_data)
-    
-    def process_frame(self, detect_result, seg_result, frame):
-        frame, frame_clean, text_mask, detect_result = self.process_ml_results(detect_result, seg_result, frame)
+    async def get_translation(self, image_with_text, extra_data):
+        return (await self.translator(await self.ocr(image_with_text)), *extra_data)
+
+    async def process_frame(self, detect_result, seg_result, frame):
+        frame, frame_clean, text_mask, detect_result = await self.process_ml_results(
+            detect_result, seg_result, frame
+        )
 
         to_translate = []
         # First pass, mask all bubbles
@@ -150,7 +155,6 @@ class FullConversion:
             bubble_text_mask = text_mask[y1:y2, x1:x2]
 
             if class_name == "text_bubble":
-         
                 if has_white(bubble_text_mask):
                     text_only, bubble_mask = mask_text_and_make_bubble_mask(
                         bubble, bubble_text_mask, bubble_clean
@@ -159,17 +163,17 @@ class FullConversion:
                     frame[y1:y2, x1:x2] = bubble_clean
                     text_draw_bounds = get_bounds_for_text(bubble_mask)
 
-                    pt1,pt2 = text_draw_bounds
+                    pt1, pt2 = text_draw_bounds
 
-                    pt1_x,pt1_y = pt1
-                    pt2_x,pt2_y = pt2
+                    pt1_x, pt1_y = pt1
+                    pt2_x, pt2_y = pt2
 
                     pt1_x += x1
                     pt2_x += x1
                     pt1_y += y1
                     pt2_y += y1
 
-                    to_translate.append([(pt1_x,pt1_y,pt2_x,pt2_y),text_only]) 
+                    to_translate.append([(pt1_x, pt1_y, pt2_x, pt2_y), text_only])
                     # debug_image(text_only,"Text Only")
             else:
                 if self.translate_free_text:
@@ -179,8 +183,8 @@ class FullConversion:
                             free_text, bubble_text_mask, bubble_clean
                         )
 
-                        to_translate.append([(x1,y1,x2,y2),text_only])
-                           
+                        to_translate.append([(x1, y1, x2, y2), text_only])
+
                     frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
                 else:
                     frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
@@ -290,6 +294,7 @@ class FullConversion:
             with torch.no_grad():  # model needs work
                 with torch.inference_mode():
                     with self.frame_process_mutex:  # this may not be needed
+
                         def fix_image(img):
                             # img = adjust_contrast_brightness(frame,contrast=2)
                             # size_dil = 3
@@ -299,78 +304,87 @@ class FullConversion:
                             # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
                             # return cv2.dilate(img,kernel,iterations = 1)
                             return img
-                        
-                        images = [fix_image(frame_with_text.copy()) for _,frame_with_text in to_translate]
+
+                        images = [
+                            fix_image(frame_with_text.copy())
+                            for _, frame_with_text in to_translate
+                        ]
                         # images = [x[2].copy() for x in to_translate]
                         # [display_image(x,"To Detect") for x in images]
-                        
-                        draw_colors = [(x.cpu().numpy() * 255).astype(np.uint8) for x in self.color_detect_model(
-                            torch.stack([transform_sample(y) for y in images]).to(torch.device("cuda:0")))]
+
+                        draw_colors = [
+                            (x.cpu().numpy() * 255).astype(np.uint8)
+                            for x in self.color_detect_model(
+                                torch.stack([transform_sample(y) for y in images]).to(
+                                    torch.device("cuda:0")
+                                )
+                            )
+                        ]
         else:
             print("Using black since color detect model is 'None'")
 
         print(f"Color Detection => {time.time() - start} seconds")
 
-
         start = time.time()
 
         to_draw = []
 
-        
+
         if self.translator and self.ocr and len(to_translate) > 0:
-            with ThreadPoolExecutor(max_workers=len(to_translate)) as executor:
-                futures = []
+            tasks = []
 
-                for i in range(len(to_translate)):
-                    bbox, frame_with_text = to_translate[i]
-                    draw_color = draw_colors[i]
+            for i in range(len(to_translate)):
+                bbox, frame_with_text = to_translate[i]
+                draw_color = draw_colors[i]
 
-                    futures.append(executor.submit(self.get_translation,frame_with_text,(bbox,draw_color)))
+                tasks.append(self.get_translation(frame_with_text,(bbox, draw_color)))
 
-
-                for future in futures:
-                    to_draw.append(future.result())
-                            
-                        
+            to_draw = [x for x in await asyncio.gather(*tasks)]
+                
 
         print(f"Ocr And Translation => {time.time() - start} seconds")
 
-
         start = time.time()
-        
-        for translation,bbox,draw_color in to_draw:
+
+        for translation, bbox, draw_color in to_draw:
             (x1, y1, x2, y2) = bbox
 
             draw_frame = frame[y1:y2, x1:x2]
 
             outline_color = get_outline_color(draw_frame, draw_color)
 
-            frame[y1:y2, x1:x2] = self.drawer(draw_color=draw_color,translation=translation,frame=draw_frame)
-            
+            frame[y1:y2, x1:x2] = await self.drawer(
+                draw_color=draw_color, translation=translation, frame=draw_frame
+            )
 
         print(f"Drawing => {time.time() - start} seconds")
         return frame
 
-    def __call__(self, images: list[np.ndarray],
-                 yolo_device=0 if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "mps" if sys.platform != "darwin" else torch.device(
-                     'cpu')) -> list[np.ndarray]:
+    async def __call__(
+        self,
+        images: list[np.ndarray],
+        yolo_device=0
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0
+        else "mps"
+        if sys.platform != "darwin"
+        else torch.device("cpu"),
+    ) -> list[np.ndarray]:
         # frames = [resize_percent(x, 50) for x in frames]
         total_start = time.time()
         start = time.time()
-        to_process = [x for x in zip(
-            self.detection_model(images, device=yolo_device, verbose=False), self.segmentation_model(
-                images, device=yolo_device, verbose=False
-            ), images
-        )]
+        to_process = [
+            x
+            for x in zip(
+                self.detection_model(images, device=yolo_device, verbose=False),
+                self.segmentation_model(images, device=yolo_device, verbose=False),
+                images,
+            )
+        ]
 
         print(f"Yolov8 Models => {time.time() - start} seconds")
 
-        with ThreadPoolExecutor(max_workers=len(to_process)) as executor:
-            futures = []
-            for i in range(len(to_process)):
-                detect_result, seg_result, frame = to_process[i]
-                futures.append(executor.submit(self.process_frame, detect_result=detect_result, seg_result=seg_result,
-                                               frame=frame))
-            result = list(map(lambda a: a.result(), futures))
-            print(f"Total Process => {time.time() - total_start} seconds")
-            return result
+        tasks = [self.process_frame(detect_result=detect_result,seg_result=seg_result,frame=frame) for detect_result, seg_result, frame in to_process]
+        results = await asyncio.gather(*tasks)
+
+        print(f"Total Process => {time.time() - total_start} seconds")
+        return results

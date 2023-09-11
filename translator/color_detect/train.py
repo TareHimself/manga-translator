@@ -7,16 +7,25 @@ from .datasets import ColorDetectionDataset
 from .models import get_color_detection_model
 
 
-def train_model(num_samples=6000, num_workers=7, backgrounds=[], epochs=1000, batch_size=32, learning_rate=0.0001,
-                weights_path=None, seed=200, train_device=torch.device("cuda:0")):
-    dataset = ColorDetectionDataset(generate_target=num_samples, backgrounds=backgrounds, generator_seed=seed,
-                                    num_workers=num_workers)
-
-    dataloader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True
+def train_model(
+    num_samples=6000,
+    num_workers=7,
+    backgrounds=[],
+    epochs=1000,
+    batch_size=32,
+    learning_rate=0.0001,
+    weights_path=None,
+    seed=200,
+    train_device=torch.device("cuda:0"),
+):
+    dataset = ColorDetectionDataset(
+        generate_target=num_samples,
+        backgrounds=backgrounds,
+        generator_seed=seed,
+        num_workers=num_workers,
     )
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model = get_color_detection_model(weights_path=weights_path, device=train_device)
 
@@ -65,11 +74,13 @@ def train_model(num_samples=6000, num_workers=7, backgrounds=[], epochs=1000, ba
                 total_count += 1
                 running_loss += loss.item() * images.size(0)
                 loading_bar.set_description_str(
-                    f'Training | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(dataloader.dataset)):.8f} | ')
+                    f"Training | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(dataloader.dataset)):.8f} | "
+                )
                 loading_bar.update()
 
             loading_bar.set_description_str(
-                f'Training | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(dataloader.dataset)):.8f} | ')
+                f"Training | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(dataloader.dataset)):.8f} | "
+            )
             loading_bar.close()
             epoch_loss = running_loss / len(dataloader.dataset)
             epoch_accu = (total_accu / total_count) * 100
@@ -77,7 +88,6 @@ def train_model(num_samples=6000, num_workers=7, backgrounds=[], epochs=1000, ba
                 best_loss = epoch_loss
                 best_state = copy.deepcopy(model.state_dict())
                 best_epoch = epoch
-
 
     except KeyboardInterrupt:
         print("Stopping training early at user request")

@@ -1,4 +1,3 @@
-
 class FilteredYoloInferenceIndices:
     BBOX = 0
     CLASS_NAME = 1

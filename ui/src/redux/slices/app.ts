@@ -77,7 +77,6 @@ const performCurrentOperation = createAsyncThunk<
     const state = store.app;
 
     const data: IServerPayload = {
-      image: state.originalImageAddress,
       translator: state.translatorId,
       ocr: state.ocrId,
       translatorArgs: state.translatorArgs.reduce(argsToPayloadReduce, {}),
@@ -89,15 +88,15 @@ const performCurrentOperation = createAsyncThunk<
     };
 
     const serverAddress = state.serverAddress;
+    const formData = new FormData()
+    formData.append('data',JSON.stringify(data))
+    formData.append('file',await fetch(state.originalImageAddress).then(a => a.blob()))
     return await fetch(
       serverAddress +
         (state.operation === EAppOperation.CLEANING ? "/clean" : "/translate"),
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+        body: formData,
       }
     )
       .then((a) => {
@@ -211,7 +210,7 @@ export const AppSlice = createSlice({
     });
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     builder.addCase(performCurrentOperation.pending, (state, _) => {
-      if (state.convertedImageAddress != "") {
+      if (state.convertedImageAddress !== "") {
         URL.revokeObjectURL(state.convertedImageAddress);
         state.convertedImageAddress = "";
       }

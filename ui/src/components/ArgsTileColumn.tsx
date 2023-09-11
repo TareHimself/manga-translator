@@ -21,7 +21,6 @@ export default function ArgsTileColumn(props: ArgsTileColumnProps) {
         const argumentName = props.category + " | " + info.name;
         const argumentKey = `${info.id}`;
         if (info.type === EServerArgumentType.TEXT) {
-          console.log(info, argumentName);
           return (
             <TileRow name={argumentName} key={argumentKey}>
               <input
@@ -48,6 +47,8 @@ export default function ArgsTileColumn(props: ArgsTileColumnProps) {
             />
           );
         }
+
+        return <></>
       })}
     </>
   );

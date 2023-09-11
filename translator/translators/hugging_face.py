@@ -1,5 +1,12 @@
 from transformers import pipeline
-from translator.core.plugin import Translator, TranslatorResult, OcrResult, PluginTextArgument, PluginArgument
+from translator.core.plugin import (
+    Translator,
+    TranslatorResult,
+    OcrResult,
+    PluginTextArgument,
+    PluginArgument,
+)
+
 
 class HuggingFace(Translator):
     """Translates using hugging face models"""
@@ -8,10 +15,10 @@ class HuggingFace(Translator):
         super().__init__()
         self.pipeline = pipeline("translation", model=model_url)
 
-    def translate(self, ocr_result: OcrResult):
+    async def translate(self, ocr_result: OcrResult):
         if len(ocr_result.text.strip()) == 0:
             return TranslatorResult()
-        
+
         return TranslatorResult(self.pipeline(ocr_result.text)[0]["translation_text"])
 
     @staticmethod
@@ -21,5 +28,10 @@ class HuggingFace(Translator):
     @staticmethod
     def get_arguments() -> list[PluginArgument]:
         return [
-            PluginTextArgument(id="model_url", name="Model", description="The Hugging Face translation model to use",
-                               default="staka/fugumt-ja-en")]
+            PluginTextArgument(
+                id="model_url",
+                name="Model",
+                description="The Hugging Face translation model to use",
+                default="staka/fugumt-ja-en",
+            )
+        ]

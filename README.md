@@ -1,6 +1,6 @@
 # Manga Translator
 
-<img src="assets/examples/ui.png"/>
+<img src="assets/examples/ui_09_11_23.png"/>
 
 ## Why ?
 

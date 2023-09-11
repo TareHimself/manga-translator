@@ -1,8 +1,11 @@
 import numpy
-from translator.core.plugin import Ocr,OcrResult, PluginArgument, PluginSelectArgument, PluginSelectArgumentOption
-
-
-
+from translator.core.plugin import (
+    Ocr,
+    OcrResult,
+    PluginArgument,
+    PluginSelectArgument,
+    PluginSelectArgumentOption,
+)
 
 
 class CleanOcr(Ocr):
@@ -11,10 +14,9 @@ class CleanOcr(Ocr):
     def __init__(self) -> None:
         super().__init__()
 
-    def do_ocr(self, text: numpy.ndarray):
+    async def do_ocr(self, text: numpy.ndarray):
         return OcrResult("", "")
 
     @staticmethod
     def get_name() -> str:
         return "Clean Ocr"
-

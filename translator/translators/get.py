@@ -5,11 +5,17 @@ from translator.translators.hugging_face import HuggingFace
 from translator.translators.debug import DebugTranslator
 from translator.translators.openai import OpenAiTranslator
 
+
 def get_translators() -> list[Translator]:
-    return list(filter(lambda a: a.is_valid(), [
-        HuggingFace,
-        DeepLTranslator,
-        GoogleTranslateTranslator,
-        DebugTranslator,
-        OpenAiTranslator
-    ]))
+    return list(
+        filter(
+            lambda a: a.is_valid(),
+            [
+                HuggingFace,
+                DeepLTranslator,
+                GoogleTranslateTranslator,
+                DebugTranslator,
+                OpenAiTranslator,
+            ],
+        )
+    )

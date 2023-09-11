@@ -1,7 +1,12 @@
 import numpy
 from translator.utils import cv2_to_pil, lang_code_to_name
-from translator.core.plugin import Ocr,OcrResult, PluginArgument, PluginSelectArgument, PluginSelectArgumentOption
-
+from translator.core.plugin import (
+    Ocr,
+    OcrResult,
+    PluginArgument,
+    PluginSelectArgument,
+    PluginSelectArgumentOption,
+)
 
 
 class EasyOcr(Ocr):
@@ -90,7 +95,7 @@ class EasyOcr(Ocr):
         "uk",
         "ur",
         "uz",
-        "vi"
+        "vi",
     ]
 
     def __init__(self, lang=languages[0]) -> None:
@@ -100,9 +105,11 @@ class EasyOcr(Ocr):
         self.easy = easyocr.Reader([lang])
         self.language = lang
 
-    def do_ocr(self, text: numpy.ndarray):
-        return OcrResult(text=self.easy.readtext(text, detail=0, paragraph=True)[0],
-                         language=self.language)  # self.language)
+    async def do_ocr(self, text: numpy.ndarray):
+        return OcrResult(
+            text=self.easy.readtext(text, detail=0, paragraph=True)[0],
+            language=self.language,
+        )  # self.language)
 
     @staticmethod
     def get_name() -> str:
@@ -110,12 +117,22 @@ class EasyOcr(Ocr):
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:
-        options = list(filter(lambda a: a.name is not None,
-                              [PluginSelectArgumentOption(name=lang_code_to_name(lang), value=lang) for lang in
-                               EasyOcr.languages]))
+        options = list(
+            filter(
+                lambda a: a.name is not None,
+                [
+                    PluginSelectArgumentOption(name=lang_code_to_name(lang), value=lang)
+                    for lang in EasyOcr.languages
+                ],
+            )
+        )
 
-        return [PluginSelectArgument(id="lang",
-                                     name="Language",
-                                     description="The language to detect",
-                                     options=options, default=options[0].value)]
-
+        return [
+            PluginSelectArgument(
+                id="lang",
+                name="Language",
+                description="The language to detect",
+                options=options,
+                default=options[0].value,
+            )
+        ]
