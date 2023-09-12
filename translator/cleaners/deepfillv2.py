@@ -162,7 +162,10 @@ class DeepFillV2Cleaner(Cleaner):
     @staticmethod
     def get_name() -> str:
         return "Deep Fill V2"
-
+    
+    async def clean_section(self,frame: np.ndarray,mask: np.ndarray) -> np.ndarray:
+        return pil_to_cv2(DeepFillV2Cleaner.in_paint(cv2_to_pil(frame),cv2_to_pil(mask)))
+    
     async def clean(
         self,
         frame: ndarray,
@@ -174,7 +177,5 @@ class DeepFillV2Cleaner(Cleaner):
             frame,
             mask=mask,
             filtered=detection_results,  # segmentation_results.boxes.xyxy.cpu().numpy()
-            inpaint_fun=lambda frame, mask: loop.create_task(DeepFillV2Cleaner.add_in_paint_task(
-                    frame, mask
-                )),
+            inpaint_fun=lambda frame, mask: loop.create_task(self.clean_section(frame,mask)),
         )

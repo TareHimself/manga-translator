@@ -213,29 +213,6 @@ def get_other_refs(tree: ast.AST,exclude: list[str]) -> dict[str,ast.AST]:
             deps[node_name] = node
 
     return deps
-        
-def try_build_module_path(current: str,remaining: list[str],max_lookaheads = 1) -> Union[str,None]:
-    
-    if len(remaining) == 0:
-        if os.path.exists(current) and os.path.isfile(current):
-            return current
-        return None
-    
-    new_path = os.path.join(current,remaining[0])
-
-    if os.path.exists(new_path):
-        return try_build_module_path(new_path,remaining[1:])
-    else:
-        for i in range(max_lookaheads):
-            delta = i + 1
-            if len(remaining) <= delta:
-                break
-
-            test_path = os.path.join(current,remaining[delta])
-            if os.path.exists(delta):
-                return try_build_module_path(test_path,remaining[delta:])
-            
-        return None
     
 
 paths_cache: dict[str,str] = {}

@@ -23,7 +23,7 @@ function argsToPayloadReduce(
 }
 
 const initialState: IAppSliceState = {
-  serverAddress: "http://127.0.0.1:5000",
+  serverAddress: window.location.origin,
   translatorId: 0,
   translators: [],
   ocrId: 0,
