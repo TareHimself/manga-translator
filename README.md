@@ -39,7 +39,7 @@
 
 ## Models
 
-- All current models are available for download [here](https://pixeldrain.com/l/9QGw78gR)
+- Available in the latest release
 
 ## Install
 
