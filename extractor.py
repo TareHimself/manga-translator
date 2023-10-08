@@ -4,11 +4,13 @@ import ast
 from typing import Any
 import os
 import re
+import sys
+from importlib.resources import is_resource
 from typing import Union
 import pkg_resources
 from functools import cmp_to_key
 INSTALLED_PACKAGES = {pkg.key for pkg in pkg_resources.working_set}
-base_dir = "./"
+BASE_DIR = os.getcwd()
 
 # This file is an attempt to extract a given function or name from a module with all its depencencies. it has trouble with relative imports and needs more work
 
@@ -213,35 +215,12 @@ def get_other_refs(tree: ast.AST,exclude: list[str]) -> dict[str,ast.AST]:
             deps[node_name] = node
 
     return deps
-        
-def try_build_module_path(current: str,remaining: list[str],max_lookaheads = 1) -> Union[str,None]:
-    
-    if len(remaining) == 0:
-        if os.path.exists(current) and os.path.isfile(current):
-            return current
-        return None
-    
-    new_path = os.path.join(current,remaining[0])
-
-    if os.path.exists(new_path):
-        return try_build_module_path(new_path,remaining[1:])
-    else:
-        for i in range(max_lookaheads):
-            delta = i + 1
-            if len(remaining) <= delta:
-                break
-
-            test_path = os.path.join(current,remaining[delta])
-            if os.path.exists(delta):
-                return try_build_module_path(test_path,remaining[delta:])
-            
-        return None
     
 
 paths_cache: dict[str,str] = {}
 
 def module_to_file_path(cur_file_path: str,module: str) -> str:
-    global base_dir
+    global BASE_DIR
     global paths_cache
     global INSTALLED_PACKAGES
 
@@ -249,7 +228,7 @@ def module_to_file_path(cur_file_path: str,module: str) -> str:
     if cache_key in paths_cache:
         return paths_cache[cache_key]
     
-    start_path = base_dir
+    start_path = BASE_DIR
 
     if module.split('.')[0] in INSTALLED_PACKAGES:
         return None
@@ -443,17 +422,11 @@ def extract_from_file(filename:str,names: list[str]):
             print(key)
             file_parts.append(content)
         import_parts.update(col_info.imports)
-            
-    return list(import_parts),file_parts
+    
+    
+    return [f"# This file was created using extractor.py\n"] + list(import_parts) + [""],file_parts
 
 
-    # # imported_refs = filter(lambda a: a in parsed_imports.keys(),map(lambda a: parsed_imports_aliases.get(a,a),related_refs))
-
-# print(extract_from_file(filename="module_test/a.py",names=["A"]))
-# print(extract_from_file(filename="translator/core/pipelines.py",names=["FullConversion"]))
-# "D:\\Github\\manga-translator\\deepfillv2-pytorch\\test.py"
-# with open("translator/core/pipelines.py",'r') as f:
-# base_dir = './lama'
 with open("out.py",'w',encoding='utf8') as out_file:
-    file_imports,file_content = extract_from_file(filename="D:\\Github\\manga-translator\\extractor.py",names=["extract_from_file"])
+    file_imports,file_content = extract_from_file(filename="D:\\Github\\manga-translator\\d.py",names=["non_max_suppression","scale_boxes","process_mask"])
     out_file.write("\n".join(file_imports + file_content))

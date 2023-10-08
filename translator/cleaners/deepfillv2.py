@@ -24,15 +24,9 @@ class DeepFillV2Cleaner(Cleaner):
 
     DEFAULT_MODEL_PATH = os.path.join("models", "inpainting.pth")
 
-    _job_queue = queue.Queue()
-
     _model = None
 
     _model_path = ""
-
-    _pending_tasks = []
-
-    _thread: Union[None, threading.Thread] = None
 
     @staticmethod
     def get_model(path: str):
@@ -99,82 +93,26 @@ class DeepFillV2Cleaner(Cleaner):
 
         return img_out
 
-    @staticmethod
-    def _in_paint_thread():
-        payload = DeepFillV2Cleaner._job_queue.get()
-
-        while payload is not None:
-            data = payload
-            pil_image, pil_mask, model_path, callback = data
-
-            callback(DeepFillV2Cleaner.in_paint(pil_image, pil_mask, model_path))
-
-            payload = DeepFillV2Cleaner._job_queue.get()
-
-    @staticmethod
-    async def add_in_paint_task(
-        image: np.ndarray, mask: np.ndarray, model_path: str = DEFAULT_MODEL_PATH
-    ):
-        loop = asyncio.get_event_loop()
-
-        pending_task = asyncio.Future()
-
-        def callback(in_paint_result):
-            nonlocal loop
-
-            loop.call_soon_threadsafe(pending_task.set_result, pil_to_cv2(in_paint_result))
-
-        DeepFillV2Cleaner._job_queue.put((cv2_to_pil(image), cv2_to_pil(mask), model_path, callback))
-        DeepFillV2Cleaner._pending_tasks.append(pending_task)
-
-        result = await pending_task
-        DeepFillV2Cleaner._pending_tasks.remove(pending_task)
-        return result
-
-    @staticmethod
-    def _stop_in_paint_thread(signum, frame):
-        sys.exit(signum)
-
-    @staticmethod
-    def _exit_thread():
-        try:
-            for task in DeepFillV2Cleaner._pending_tasks:
-                task.cancel()
-            # callback_queue.put(None)
-            if DeepFillV2Cleaner._thread.is_alive():
-                DeepFillV2Cleaner._job_queue.put(None)
-                DeepFillV2Cleaner._thread.join()
-        except:
-            pass
 
     def __init__(self) -> None:
         super().__init__()
 
-        if DeepFillV2Cleaner._thread is None:
-            DeepFillV2Cleaner._thread = threading.Thread(
-                target=lambda: DeepFillV2Cleaner._in_paint_thread(),
-                group=None,
-                daemon=True,
-            )
-            DeepFillV2Cleaner._thread.start()
-            atexit.register(DeepFillV2Cleaner._exit_thread)
-
     @staticmethod
     def get_name() -> str:
         return "Deep Fill V2"
-
+    
+    def clean_section(self,frame: np.ndarray,mask: np.ndarray) -> np.ndarray:
+        return pil_to_cv2(DeepFillV2Cleaner.in_paint(cv2_to_pil(frame),cv2_to_pil(mask)))
+    
     async def clean(
         self,
         frame: ndarray,
         mask: ndarray,
         detection_results: list[tuple[tuple[int, int, int, int], str, float]] = [],
     ) -> tuple[ndarray, ndarray]:
-        loop = asyncio.get_event_loop()
         return await in_paint_optimized(
             frame,
             mask=mask,
             filtered=detection_results,  # segmentation_results.boxes.xyxy.cpu().numpy()
-            inpaint_fun=lambda frame, mask: loop.create_task(DeepFillV2Cleaner.add_in_paint_task(
-                    frame, mask
-                )),
+            inpaint_fun=lambda frame, mask: self.clean_section(frame,mask),
         )

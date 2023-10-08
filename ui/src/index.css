@@ -27,7 +27,8 @@ code {
   justify-content: center;
   box-sizing: border-box;
   padding: 20px;
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: hidden;
 }
 
 .tile {
@@ -84,12 +85,14 @@ code {
   position: absolute;
   width: 70%;
   transition: all ease-in-out 0.2s;
+
 }
 
 .tile[data-fit="page"] img {
   width: 70%;
   height: 100%;
   object-fit: contain;
+  
 }
 
 /* .tile img {
@@ -170,4 +173,26 @@ code {
   padding: 0px;
   margin: 0px;
   flex: 1;
+}
+
+@media (max-width: 900px) {
+  .app {
+    flex-direction: column;
+    overflow-y: scroll;
+    justify-content: flex-start;
+  }
+
+  .tile {
+    
+    flex: none;
+    overflow-y: hidden;
+  }
+
+  .tile img {
+    position: relative;
+  }
+
+  .tile[data-fit] {
+    height: auto;
+  }
 }

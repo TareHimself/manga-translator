@@ -1,6 +1,6 @@
 from typing import Any
 from numpy import ndarray
-from translator.core.plugin import Drawer, TranslatorResult
+from translator.core.plugin import Drawable, Drawer, TranslatorResult
 from translator.utils import (
     get_best_font_size,
     cv2_to_pil,
@@ -12,11 +12,6 @@ from translator.utils import (
 
 class VerticalDrawer(Drawer):
     """Draws text vertically"""
-
-    async def draw(
-        self, draw_color: ndarray, translation: TranslatorResult, frame: ndarray
-    ) -> ndarray:
-        return super().draw(draw_color, translation, frame)
 
     @staticmethod
     def is_valid() -> bool:

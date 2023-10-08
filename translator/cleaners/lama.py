@@ -21,7 +21,7 @@ class LamaCleaner(Cleaner):
     def get_arguments() -> list[PluginArgument]:
         return [PluginTextArgument(id="dilation", name="Mask Dilation",description="The dilation used for the text mask", default="9")]
     
-    async def clean_with_lama(self,frame,mask):
+    def clean_with_lama(self,frame,mask):
         return pil_to_cv2(
                 self.lama(cv2_to_pil(frame), cv2_to_pil(mask).convert("L"))
             )
@@ -32,11 +32,10 @@ class LamaCleaner(Cleaner):
         mask: ndarray,
         detection_results: list[tuple[tuple[int, int, int, int], str, float]] = ...,
     ) -> tuple[ndarray, ndarray]:
-        loop = asyncio.get_event_loop()
         return await in_paint_optimized(
             frame=frame,
             mask=mask,
             filtered=detection_results,
             mask_dilation_kernel_size=self.dilation,
-            inpaint_fun=lambda f, m: loop.create_task(self.clean_with_lama(f,m)),
+            inpaint_fun=lambda f, m: self.clean_with_lama(f,m),
         )

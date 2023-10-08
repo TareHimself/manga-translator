@@ -32,3 +32,4 @@ manga-translator-service-account-data.json
 exa/*
 local/*
 trans-test/*
+*.env

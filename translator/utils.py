@@ -12,6 +12,7 @@ import numpy as np
 import PIL
 import PySimpleGUI as sg
 import asyncio
+import inspect
 import largestinteriorrectangle as lir
 from torchvision import transforms
 from typing import Union, Callable
@@ -19,12 +20,41 @@ from PIL import Image, ImageDraw, ImageFont
 from hyphen import Hyphenator
 from tqdm import tqdm
 from collections import deque
+import traceback
 
 
 class TranslatorGlobals:
     COLOR_BLACK = np.array((0, 0, 0))
     COLOR_WHITE = np.array((255, 255, 255))
 
+async def run_in_thread(func,*args,**kwargs):
+    loop = asyncio.get_event_loop()
+    task = asyncio.Future()
+    def run():
+        nonlocal loop
+        nonlocal func
+        nonlocal task
+        
+        result = func(*args,**kwargs)
+        
+        if inspect.isawaitable(result):
+            result = asyncio.run(result)
+        loop.call_soon_threadsafe(task.set_result,result)
+    
+    task_thread = threading.Thread(group=None,daemon=True,target=run)
+    task_thread.start()
+    return await task
+
+def run_in_thread_decorator(func):
+    async def wrapper(*args,**kwargs):
+        return await run_in_thread(func,*args,**kwargs)
+    
+    return wrapper
+
+
+    
+def get_torch_device() -> torch.device:
+    return torch.device('cuda') if torch.cuda.is_available() else (torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu'))
 
 def simplify_lang_code(code: str) -> Union[str, None]:
     try:
@@ -404,7 +434,7 @@ def mask_text_for_in_painting(frame: np.ndarray, mask: np.ndarray):
 
     return new_mask
 
-
+@run_in_thread_decorator
 async def in_paint_optimized(
     frame: np.ndarray,
     mask: np.ndarray,
@@ -412,7 +442,7 @@ async def in_paint_optimized(
     max_height: int = 256,
     max_width: int = 256,
     mask_dilation_kernel_size: int = 9,
-    inpaint_fun: Callable[[np.ndarray, np.ndarray], asyncio.Task[np.ndarray]] = lambda a, b: a,
+    inpaint_fun: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda a, b: a,
 ) -> tuple[np.ndarray, np.ndarray]:
     h, w, c = frame.shape
     max_height = int(math.floor(max_height / 8) * 8)
@@ -426,109 +456,113 @@ async def in_paint_optimized(
     half_width = int(max_width / 2)
 
     for bbox, cls, conf in filtered:
-        bx1, by1, bx2, by2 = bbox
-        bx1, by1, bx2, by2 = round(bx1), round(by1), round(bx2), round(by2)
+        try:
+            bx1, by1, bx2, by2 = bbox
+            bx1, by1, bx2, by2 = round(bx1), round(by1), round(bx2), round(by2)
 
-        half_bx = round((bx2 - bx1) / 2)
-        half_by = round((by2 - by1) / 2)
-        midpoint_x, midpoint_y = round(bx1 + half_bx), round(by1 + half_by)
+            half_bx = round((bx2 - bx1) / 2)
+            half_by = round((by2 - by1) / 2)
+            midpoint_x, midpoint_y = round(bx1 + half_bx), round(by1 + half_by)
 
-        x1, y1 = max(0, midpoint_x - half_width), max(0, midpoint_y - half_height)
+            x1, y1 = max(0, midpoint_x - half_width), max(0, midpoint_y - half_height)
 
-        x2, y2 = min(w, midpoint_x + half_width), min(h, midpoint_y + half_height)
+            x2, y2 = min(w, midpoint_x + half_width), min(h, midpoint_y + half_height)
 
-        if y2 < by2:
-            y2 = by2
+            if y2 < by2:
+                y2 = by2
 
-        if y1 > by1:
-            y1 = by1
+            if y1 > by1:
+                y1 = by1
 
-        if x2 < bx2:
-            x2 = bx2
+            if x2 < bx2:
+                x2 = bx2
 
-        if x1 > bx1:
-            x1 = bx1
+            if x1 > bx1:
+                x1 = bx1
 
-        overflow_x = (x2 - x1) % 8
-        x1_adjust = 0
-        if overflow_x != 0:
-            if x2 > x1:
-                x2 -= overflow_x
-            else:
-                x1 += overflow_x
-                x1_adjust = overflow_x
+            overflow_x = (x2 - x1) % 8
+            x1_adjust = 0
+            if overflow_x != 0:
+                if x2 > x1:
+                    x2 -= overflow_x
+                else:
+                    x1 += overflow_x
+                    x1_adjust = overflow_x
 
-        overflow_y = (y2 - y1) % 8
+            overflow_y = (y2 - y1) % 8
 
-        y1_adjust = 0
-        if overflow_y != 0:
-            if y2 > y1:
-                y2 -= overflow_y
-            else:
-                y1 += overflow_y
-                y1_adjust = overflow_y
+            y1_adjust = 0
+            if overflow_y != 0:
+                if y2 > y1:
+                    y2 -= overflow_y
+                else:
+                    y1 += overflow_y
+                    y1_adjust = overflow_y
 
-        bx1 = bx1 - (x1 + x1_adjust)
-        bx2 = bx2 - (x1 + x1_adjust)
-        by1 = by1 - (y1 + y1_adjust)
-        by2 = by2 - (y1 + y1_adjust)
+            bx1 = bx1 - (x1 + x1_adjust)
+            bx2 = bx2 - (x1 + x1_adjust)
+            by1 = by1 - (y1 + y1_adjust)
+            by2 = by2 - (y1 + y1_adjust)
 
-        region_mask = mask[y1:y2, x1:x2].copy()
+            region_mask = mask[y1:y2, x1:x2].copy()
 
-        focus_mask = cv2.rectangle(
-            np.zeros_like(region_mask),
-            (bx1, by1),
-            (bx2, by2),
-            (255, 255, 255),
-            -1,
-        )
-
-        region_mask = apply_mask(
-            region_mask, np.zeros_like(region_mask), focus_mask, True
-        )
-
-        if has_white(region_mask):
-            (
-                target_region_x1,
-                target_region_y1,
-                target_region_x2,
-                target_region_y2,
-            ) = get_masked_bounds(region_mask)
-
-            section_to_in_paint = final[y1:y2, x1:x2]
-
-            section_to_refine = section_to_in_paint[
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ]
-            section_to_refine_mask = region_mask[
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ]
-
-            # Generate a mask of the actual characters/text
-            refined_mask = np.zeros_like(region_mask)
-            refined_mask[
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ] = mask_text_for_in_painting(section_to_refine, section_to_refine_mask)
-
-            # The text mask is used for other stuff so we set it here before we dilate for inpainting
-            text_mask[y1:y2, x1:x2][
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ] = refined_mask[
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ].copy()
-
-            # Dilate the text mask for inpainting
-            kernel = np.ones(
-                (mask_dilation_kernel_size, mask_dilation_kernel_size), np.uint8
+            focus_mask = cv2.rectangle(
+                np.zeros_like(region_mask),
+                (bx1, by1),
+                (bx2, by2),
+                (255, 255, 255),
+                -1,
             )
-            refined_mask = cv2.dilate(refined_mask, kernel, iterations=1)
 
-            # Inpaint using the dilated text mask
-            final[y1:y2, x1:x2][
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ] = (await inpaint_fun(final[y1:y2, x1:x2], refined_mask))[
-                target_region_y1:target_region_y2, target_region_x1:target_region_x2
-            ]
+            region_mask = apply_mask(
+                region_mask, np.zeros_like(region_mask), focus_mask, True
+            )
+
+            if has_white(region_mask):
+                (
+                    target_region_x1,
+                    target_region_y1,
+                    target_region_x2,
+                    target_region_y2,
+                ) = get_masked_bounds(region_mask)
+
+                section_to_in_paint = final[y1:y2, x1:x2]
+
+                section_to_refine = section_to_in_paint[
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ]
+                section_to_refine_mask = region_mask[
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ]
+
+                # Generate a mask of the actual characters/text
+                refined_mask = np.zeros_like(region_mask)
+                refined_mask[
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ] = mask_text_for_in_painting(section_to_refine, section_to_refine_mask)
+
+                # The text mask is used for other stuff so we set it here before we dilate for inpainting
+                text_mask[y1:y2, x1:x2][
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ] = refined_mask[
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ].copy()
+
+                # Dilate the text mask for inpainting
+                kernel = np.ones(
+                    (mask_dilation_kernel_size, mask_dilation_kernel_size), np.uint8
+                )
+                refined_mask = cv2.dilate(refined_mask, kernel, iterations=1)
+
+                # Inpaint using the dilated text mask
+                final[y1:y2, x1:x2][
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ] = inpaint_fun(final[y1:y2, x1:x2], refined_mask)[
+                    target_region_y1:target_region_y2, target_region_x1:target_region_x2
+                ]
+        except:
+            traceback.print_exc()
+            continue
 
     return final, text_mask
 
@@ -1329,6 +1363,45 @@ def roboflow_coco_to_yolo(dataset_dir):
 
     os.remove(annotations_path)
 
+def union(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]) -> float:
+    box1_x1, box1_y1, box1_x2, box1_y2 = box1
+    box2_x1, box2_y1, box2_x2, box2_y2 = box2
+
+    box1_area = (box1_x2 - box1_x1) * (box1_y2 - box1_y1)
+    box2_area = (box2_x2 - box2_x1) * (box2_y2 - box2_y1)
+    return box1_area + box2_area - intersection(box1, box2)
+
+def intersection(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]) -> float:
+    box1_x1, box1_y1, box1_x2, box1_y2 = box1
+    box2_x1, box2_y1, box2_x2, box2_y2 = box2
+    x1 = max(box1_x1, box2_x1)
+    y1 = max(box1_y1, box2_y1)
+    x2 = min(box1_x2, box2_x2)
+    y2 = min(box1_y2, box2_y2)
+    return (x2 - x1) * (y2 - y1)
+
+
+def overlap_area(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]):
+    box1_x1, box1_y1, box1_x2, box1_y2 = box1
+    box2_x1, box2_y1, box2_x2, box2_y2 = box2
+
+    if box1_x2 < box2_x1 or (not (box1_y1 <= box2_y1 <= box1_y2) and not (box2_y1 <= box1_y1 <= box2_y2) and not (box1_y1 <= box2_y2 <= box1_y2) and not (box2_y1 <= box1_y2 <= box2_y2)):
+        return 0
+    
+    return 1
+
+def overlap_percent(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]) -> float:
+    if (box2_x1 - box1_x1) < 0:
+        area_overlaped = overlap_area(box2,box1)
+    else:
+        area_overlaped = overlap_area(box1,box2)
+    
+    if area_overlaped == 0:
+        return 0
+    
+
+    box1_x1, box1_y1, box1_x2, box1_y2 = box1
+    box2_x1, box2_y1, box2_x2, box2_y2 = box2
 
 def is_cuda_available():
     return torch.cuda.is_available() and torch.cuda.device_count() > 0

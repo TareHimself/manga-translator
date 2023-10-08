@@ -105,11 +105,11 @@ class EasyOcr(Ocr):
         self.easy = easyocr.Reader([lang])
         self.language = lang
 
-    async def do_ocr(self, text: numpy.ndarray):
-        return OcrResult(
-            text=self.easy.readtext(text, detail=0, paragraph=True)[0],
+    async def do_ocr(self, texts: list[numpy.ndarray]):
+        return [OcrResult(
+            text=self.easy.readtext(x, detail=0, paragraph=True)[0],
             language=self.language,
-        )  # self.language)
+        )  for x in texts]
 
     @staticmethod
     def get_name() -> str:

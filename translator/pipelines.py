@@ -8,9 +8,11 @@ from translator.utils import (
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
     TranslatorGlobals,
+    run_in_thread_decorator,
     transform_sample,
     has_white,
     get_model_path,
+    apply_mask
 )
 import traceback
 import threading
@@ -19,7 +21,7 @@ import asyncio
 from typing import Union
 from concurrent.futures import ThreadPoolExecutor
 from translator.color_detect.models import get_color_detection_model
-from translator.core.plugin import Translator, Ocr, Drawer, Cleaner
+from translator.core.plugin import Drawable, Translator, Ocr, Drawer, Cleaner
 from translator.cleaners.deepfillv2 import DeepFillV2Cleaner
 from translator.drawers.horizontal import HorizontalDrawer
 
@@ -87,21 +89,35 @@ class FullConversion:
 
         confidence = np.array(results.boxes.conf.cpu(), dtype="float")
 
-        filtered: list[tuple[tuple[int, int, int, int], str, float]] = []
+        raw_results: list[tuple[tuple[int, int, int, int], str, float]] = []
 
+        # has_similar = False
+        #         for item, _, __ in filtered:
+        #             print(np.absolute(item - box))
+        #             diff = np.average(np.absolute(item - box))
+        #             if diff < 10:
+        #                 has_similar = True
+        #                 break
+        #         if has_similar:
+        #             continue
+        
         for box, obj_class, conf in zip(bounding_boxes, classes, confidence):
             if conf >= min_confidence:
-                has_similar = False
-                for item, _, __ in filtered:
-                    diff = np.average(np.absolute(item - box))
-                    if diff < 10:
-                        has_similar = True
-                        break
-                if has_similar:
-                    continue
-                filtered.append((box, results.names[obj_class], conf))
+                raw_results.append((box, results.names[obj_class], conf))
 
-        return filtered
+        raw_results.sort(key= lambda a: 1 - a[2])
+
+        results: list[tuple[tuple[int, int, int, int], str, float]] = []
+
+        # print(f"Starting with {len(raw_results)} results")
+        # while len(raw_results) > 0:
+        #     results.append(raw_results[0])
+        #     raw_results = list(filter(lambda a: iou(raw_results[0][0],a[0]) < 0.5,raw_results))
+
+        results = raw_results
+
+        # print(f"Ended with {len(results)} results")
+        return results
 
     async def process_ml_results(self, detect_result, seg_result, frame):
         text_mask = np.zeros_like(frame, dtype=frame.dtype)
@@ -132,233 +148,251 @@ class FullConversion:
     async def get_translation(self, image_with_text, extra_data):
         return (await self.translator(await self.ocr(image_with_text)), *extra_data)
 
+    @run_in_thread_decorator
     async def process_frame(self, detect_result, seg_result, frame):
-        frame, frame_clean, text_mask, detect_result = await self.process_ml_results(
-            detect_result, seg_result, frame
-        )
-
-        to_translate = []
-        # First pass, mask all bubbles
-        for bbox, cls, conf in detect_result:
-            # if conf < 0.65:
-            #     continue
-
-            # print(get_ocr(get_box_section(frame, box)))
-            color = (0, 0, 255) if cls == 1 else (0, 255, 0)
-
-            (x1, y1, x2, y2) = bbox
-
-            class_name = cls
-
-            bubble = frame[y1:y2, x1:x2]
-            bubble_clean = frame_clean[y1:y2, x1:x2]
-            bubble_text_mask = text_mask[y1:y2, x1:x2]
-
-            if class_name == "text_bubble":
-                if has_white(bubble_text_mask):
-                    text_only, bubble_mask = mask_text_and_make_bubble_mask(
-                        bubble, bubble_text_mask, bubble_clean
-                    )
-
-                    frame[y1:y2, x1:x2] = bubble_clean
-                    text_draw_bounds = get_bounds_for_text(bubble_mask)
-
-                    pt1, pt2 = text_draw_bounds
-
-                    pt1_x, pt1_y = pt1
-                    pt2_x, pt2_y = pt2
-
-                    pt1_x += x1
-                    pt2_x += x1
-                    pt1_y += y1
-                    pt2_y += y1
-
-                    to_translate.append([(pt1_x, pt1_y, pt2_x, pt2_y), text_only])
-                    # debug_image(text_only,"Text Only")
-            else:
-                if self.translate_free_text:
-                    free_text = frame[y1:y2, x1:x2]
-                    if has_white(free_text):
-                        text_only, _ = mask_text_and_make_bubble_mask(
-                            free_text, bubble_text_mask, bubble_clean
-                        )
-
-                        to_translate.append([(x1, y1, x2, y2), text_only])
-
-                    frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
-                else:
-                    frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
-
-            if self.debug:
-                cv2.putText(
-                    frame,
-                    str(f"{cls} | {conf * 100:.1f}%"),
-                    (x1, y1 - 20),
-                    cv2.FONT_HERSHEY_PLAIN,
-                    1,
-                    color,
-                    2,
-                )
-
-        # second pass, fix intersecting text areas
-        # for i in range(len(to_translate)):
-        #     bbox_a = to_translate[i][0]
-        #     text_bounds_a_local = to_translate[i][3]
-        #     text_bounds_a = [
-        #         [
-        #             text_bounds_a_local[0][0] + bbox_a[0],
-        #             text_bounds_a_local[0][1] + bbox_a[1],
-        #         ],
-        #         [
-        #             text_bounds_a_local[1][0] + bbox_a[0],
-        #             text_bounds_a_local[1][1] + bbox_a[1],
-        #         ],
-        #     ]
-        #     for x in range(len(to_translate)):
-        #         if x == i:
-        #             continue
-
-        #         bbox_b = to_translate[x][0]
-        #         text_bounds_b_local = to_translate[x][3]
-        #         text_bounds_b = [
-        #             [
-        #                 text_bounds_b_local[0][0] + bbox_b[0],
-        #                 text_bounds_b_local[0][1] + bbox_b[1],
-        #             ],
-        #             [
-        #                 text_bounds_b_local[1][0] + bbox_b[0],
-        #                 text_bounds_b_local[1][1] + bbox_b[1],
-        #             ],
-        #         ]
-
-        #         fix_result = fix_intersection(
-        #             text_bounds_a[0],
-        #             text_bounds_a[1],
-        #             text_bounds_b[0],
-        #             text_bounds_b[1],
-        #         )
-        #         found_intersection = fix_result[4]
-        #         if found_intersection:
-        #             to_translate[i][3] = [
-        #                 [
-        #                     fix_result[0][0] - bbox_a[0],
-        #                     fix_result[0][1] - bbox_a[1],
-        #                 ],
-        #                 [torch.cuda.is_available()
-        #                     fix_result[1][0] - bbox_a[0],
-        #                     fix_result[1][1] - bbox_a[1],
-        #                 ],
-        #             ]
-        #             to_translate[x][3] = [
-        #                 [
-        #                     fix_result[2][0] - bbox_b[0],
-        #                     fix_result[2][1] - bbox_b[1],
-        #                 ],
-        #                 [
-        #                     fix_result[3][0] - bbox_b[0],
-        #                     fix_result[3][1] - bbox_b[1],
-        #                 ],
-        #             ]
-        # print(
-        #     bbox_a,
-        #     text_bounds_a_local,
-        #     text_bounds_a,
-        #     "\n",
-        #     bbox_b,
-        #     text_bounds_b_local,
-        #     text_bounds_b,
-        # )
-        # debug_image(to_translate[i][1])
-        # debug_image(to_translate[x][1])
-        # cv2.rectangle(
-        #     frame,
-        #     fix_result[0],
-        #     fix_result[1],
-        #     (0, 255, 255),
-        #     1,
-        # )
-        # cv2.rectangle(
-        #     frame,
-        #     fix_result[2],
-        #     fix_result[3],
-        #     (0, 255, 255),
-        #     1,
-        # )
-        # print("intersection found")
-
-        # third pass, draw text
-        draw_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
-
-        start = time.time()
-        if self.color_detect_model is not None and len(draw_colors) > 0:
-            with torch.no_grad():  # model needs work
-                with torch.inference_mode():
-                    with self.frame_process_mutex:  # this may not be needed
-
-                        def fix_image(img):
-                            # img = adjust_contrast_brightness(frame,contrast=2)
-                            # size_dil = 3
-                            # returncv2.GaussianBlur(img, (size_dil, size_dil), 0)
-
-                            # final_mask_dilation = 6
-                            # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
-                            # return cv2.dilate(img,kernel,iterations = 1)
-                            return img
-
-                        images = [
-                            fix_image(frame_with_text.copy())
-                            for _, frame_with_text in to_translate
-                        ]
-                        # images = [x[2].copy() for x in to_translate]
-                        # [display_image(x,"To Detect") for x in images]
-
-                        draw_colors = [
-                            (x.cpu().numpy() * 255).astype(np.uint8)
-                            for x in self.color_detect_model(
-                                torch.stack([transform_sample(y) for y in images]).to(
-                                    torch.device("cuda:0")
-                                )
-                            )
-                        ]
-        else:
-            print("Using black since color detect model is 'None'")
-
-        print(f"Color Detection => {time.time() - start} seconds")
-
-        start = time.time()
-
-        to_draw = []
-
-
-        if self.translator and self.ocr and len(to_translate) > 0:
-            tasks = []
-
-            for i in range(len(to_translate)):
-                bbox, frame_with_text = to_translate[i]
-                draw_color = draw_colors[i]
-
-                tasks.append(self.get_translation(frame_with_text,(bbox, draw_color)))
-
-            to_draw = [x for x in await asyncio.gather(*tasks)]
-                
-
-        print(f"Ocr And Translation => {time.time() - start} seconds")
-
-        start = time.time()
-
-        for translation, bbox, draw_color in to_draw:
-            (x1, y1, x2, y2) = bbox
-
-            draw_frame = frame[y1:y2, x1:x2]
-
-            outline_color = get_outline_color(draw_frame, draw_color)
-
-            frame[y1:y2, x1:x2] = await self.drawer(
-                draw_color=draw_color, translation=translation, frame=draw_frame
+        try:
+            frame, frame_clean, text_mask, detect_result = await self.process_ml_results(
+                detect_result, seg_result, frame
             )
 
-        print(f"Drawing => {time.time() - start} seconds")
-        return frame
+            to_translate = []
+            # First pass, mask all bubbles
+            for bbox, cls, conf in detect_result:
+                try:
+                    # if conf < 0.65:
+                    #     continue
+
+                    # print(get_ocr(get_box_section(frame, box)))
+                    color = (0, 0, 255) if cls == 1 else (0, 255, 0)
+
+                    (x1, y1, x2, y2) = bbox
+
+                    class_name = cls
+
+                    bubble = frame[y1:y2, x1:x2]
+                    bubble_clean = frame_clean[y1:y2, x1:x2]
+                    bubble_text_mask = text_mask[y1:y2, x1:x2]
+
+                    if class_name == "text_bubble":
+                        if has_white(bubble_text_mask):
+                            text_only, bubble_mask = mask_text_and_make_bubble_mask(
+                                bubble, bubble_text_mask, bubble_clean
+                            )
+
+                            frame[y1:y2, x1:x2] = bubble_clean
+                            text_draw_bounds = get_bounds_for_text(bubble_mask)
+
+                            pt1, pt2 = text_draw_bounds
+
+                            pt1_x, pt1_y = pt1
+                            pt2_x, pt2_y = pt2
+
+                            pt1_x += x1
+                            pt2_x += x1
+                            pt1_y += y1
+                            pt2_y += y1
+
+                            to_translate.append([(pt1_x, pt1_y, pt2_x, pt2_y), text_only])
+
+                            # frame = cv2.rectangle(frame,(x1,y1),(x2,y2),color=(255,255,0),thickness=2)
+                            # debug_image(text_only,"Text Only")
+                    else:
+                        if self.translate_free_text:
+                            free_text = frame[y1:y2, x1:x2]
+                            if has_white(free_text):
+                                text_only, _ = mask_text_and_make_bubble_mask(
+                                    free_text, bubble_text_mask, bubble_clean
+                                )
+
+                                to_translate.append([(x1, y1, x2, y2), text_only])
+
+                            frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
+                        else:
+                            frame[y1:y2, x1:x2] = frame_clean[y1:y2, x1:x2]
+
+                    if self.debug:
+                        cv2.putText(
+                            frame,
+                            str(f"{cls} | {conf * 100:.1f}%"),
+                            (x1, y1 - 20),
+                            cv2.FONT_HERSHEY_PLAIN,
+                            1,
+                            color,
+                            2,
+                        )
+                except:
+                    traceback.print_exc()
+
+            # second pass, fix intersecting text areas
+            # for i in range(len(to_translate)):
+            #     bbox_a = to_translate[i][0]
+            #     text_bounds_a_local = to_translate[i][3]
+            #     text_bounds_a = [
+            #         [
+            #             text_bounds_a_local[0][0] + bbox_a[0],
+            #             text_bounds_a_local[0][1] + bbox_a[1],
+            #         ],
+            #         [
+            #             text_bounds_a_local[1][0] + bbox_a[0],
+            #             text_bounds_a_local[1][1] + bbox_a[1],
+            #         ],
+            #     ]
+            #     for x in range(len(to_translate)):
+            #         if x == i:
+            #             continue
+
+            #         bbox_b = to_translate[x][0]
+            #         text_bounds_b_local = to_translate[x][3]
+            #         text_bounds_b = [
+            #             [
+            #                 text_bounds_b_local[0][0] + bbox_b[0],
+            #                 text_bounds_b_local[0][1] + bbox_b[1],
+            #             ],
+            #             [
+            #                 text_bounds_b_local[1][0] + bbox_b[0],
+            #                 text_bounds_b_local[1][1] + bbox_b[1],
+            #             ],
+            #         ]
+
+            #         fix_result = fix_intersection(
+            #             text_bounds_a[0],
+            #             text_bounds_a[1],
+            #             text_bounds_b[0],
+            #             text_bounds_b[1],
+            #         )
+            #         found_intersection = fix_result[4]
+            #         if found_intersection:
+            #             to_translate[i][3] = [
+            #                 [
+            #                     fix_result[0][0] - bbox_a[0],
+            #                     fix_result[0][1] - bbox_a[1],
+            #                 ],
+            #                 [torch.cuda.is_available()
+            #                     fix_result[1][0] - bbox_a[0],
+            #                     fix_result[1][1] - bbox_a[1],
+            #                 ],
+            #             ]
+            #             to_translate[x][3] = [
+            #                 [
+            #                     fix_result[2][0] - bbox_b[0],
+            #                     fix_result[2][1] - bbox_b[1],
+            #                 ],
+            #                 [
+            #                     fix_result[3][0] - bbox_b[0],
+            #                     fix_result[3][1] - bbox_b[1],
+            #                 ],
+            #             ]
+            # print(
+            #     bbox_a,
+            #     text_bounds_a_local,
+            #     text_bounds_a,
+            #     "\n",
+            #     bbox_b,
+            #     text_bounds_b_local,
+            #     text_bounds_b,
+            # )
+            # debug_image(to_translate[i][1])
+            # debug_image(to_translate[x][1])
+            # cv2.rectangle(
+            #     frame,
+            #     fix_result[0],
+            #     fix_result[1],
+            #     (0, 255, 255),
+            #     1,
+            # )
+            # cv2.rectangle(
+            #     frame,
+            #     fix_result[2],
+            #     fix_result[3],
+            #     (0, 255, 255),
+            #     1,
+            # )
+            # print("intersection found")
+
+            # third pass, draw text
+            draw_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
+
+            start = time.time()
+            if self.color_detect_model is not None and len(draw_colors) > 0:
+                with torch.no_grad():  # model needs work
+                    with torch.inference_mode():
+                        with self.frame_process_mutex:  # this may not be needed
+
+                            def fix_image(img):
+                                # img = adjust_contrast_brightness(frame,contrast=2)
+                                # size_dil = 3
+                                # returncv2.GaussianBlur(img, (size_dil, size_dil), 0)
+
+                                # final_mask_dilation = 6
+                                # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
+                                # return cv2.dilate(img,kernel,iterations = 1)
+                                return img
+
+                            images = [
+                                fix_image(frame_with_text.copy())
+                                for _, frame_with_text in to_translate
+                            ]
+                            # images = [x[2].copy() for x in to_translate]
+                            # [display_image(x,"To Detect") for x in images]
+
+                            draw_colors = [
+                                (x.cpu().numpy() * 255).astype(np.uint8)
+                                for x in self.color_detect_model(
+                                    torch.stack([transform_sample(y) for y in images]).to(
+                                        torch.device("cuda:0")
+                                    )
+                                )
+                            ]
+            else:
+                print("Using black since color detect model is 'None'")
+
+            print(f"Color Detection => {time.time() - start} seconds")
+
+            start = time.time()
+
+            to_draw = []
+
+
+            if self.translator and self.ocr and len(to_translate) > 0:
+                bboxes,images = zip(*to_translate)
+
+                ocr_results = await self.ocr(images)
+
+                translation_results = await self.translator(ocr_results)
+
+                to_draw = []
+                for bbox,translation,color in zip(bboxes,translation_results,draw_colors):
+
+                    (x1, y1, x2, y2) = bbox
+                    draw_area = frame[y1:y2, x1:x2].copy()
+
+                    to_draw.append(Drawable(color=color,frame=draw_area,translation=translation))
+
+                    
+
+                print(f"Ocr And Translation => {time.time() - start} seconds")
+
+                start = time.time()
+
+                drawn_frames = await self.drawer(to_draw)
+
+
+                for bbox, drawn_frame in zip(bboxes,drawn_frames):
+                    (x1, y1, x2, y2) = bbox
+
+                    # draw_frame = frame[y1:y2, x1:x2]
+
+                    # outline_color = get_outline_color(draw_frame, draw_color)
+
+                    drawn_frame,drawn_frame_mask = drawn_frame
+
+                    frame[y1:y2, x1:x2] = apply_mask(frame[y1:y2,x1:x2],drawn_frame,drawn_frame_mask)
+
+                print(f"Drawing => {time.time() - start} seconds")
+            return frame
+        except:
+            traceback.print_exc()
+            return None
 
     async def __call__(
         self,

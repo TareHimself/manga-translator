@@ -14,8 +14,8 @@ class DebugTranslator(Translator):
         super().__init__()
         self.to_write = text
 
-    async def translate(self, ocr_result: OcrResult):
-        return TranslatorResult(self.to_write)
+    async def translate(self, ocr_results: list[OcrResult]):
+        return [TranslatorResult(self.to_write) for _ in ocr_results]
 
     @staticmethod
     def get_name() -> str:
