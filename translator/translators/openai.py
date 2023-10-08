@@ -1,3 +1,4 @@
+import asyncio
 from translator.utils import get_languages
 from translator.core.plugin import (
     Translator,
@@ -33,10 +34,7 @@ class OpenAiTranslator(Translator):
         self.model = model
         self.temp = float(temp)
 
-    async def translate(self, ocr_result: OcrResult):
-        if len(ocr_result.text.strip()) == 0:
-            return TranslatorResult(lang_code=self.target_lang)
-
+    async def translate_one(self,ocr_result: OcrResult):
         message = f"{ocr_result.language.upper()} to {self.target_lang.upper()}\n{ocr_result.text}"
 
         result = self.openai.ChatCompletion.create(
@@ -50,6 +48,15 @@ class OpenAiTranslator(Translator):
         return TranslatorResult(
             result["choices"][0].message["content"].strip(), self.target_lang
         )
+    
+    async def translate(self, ocr_results: list[OcrResult]):
+        if len(ocr_results) == 0:
+            return [TranslatorResult(lang_code=self.target_lang) for _ in ocr_results]
+        
+
+        return await asyncio.gather(*[self.translate_one(x) for x in ocr_results])
+
+        
 
     @staticmethod
     def get_name() -> str:

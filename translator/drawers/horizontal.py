@@ -3,7 +3,9 @@ import numpy as np
 from PIL import ImageFont, ImageDraw
 from numpy import ndarray
 from hyphen import Hyphenator
+import asyncio
 from translator.core.plugin import (
+    Drawable,
     Drawer,
     PluginArgument,
     PluginSelectArgument,
@@ -31,13 +33,19 @@ class HorizontalDrawer(Drawer):
         self.line_spacing = round(float(line_spacing))
 
     async def draw(
-        self, draw_color: np.ndarray, translation: TranslatorResult, frame: np.ndarray
-    ) -> ndarray:
-        # print(color_diff(np.array(color),np.array((0,0,0))))
-        if len(translation.text.strip()) <= 0:
-            return frame
+        self,to_draw: list[Drawable]
+    ) -> list[tuple[ndarray,ndarray]]:
+        return await asyncio.gather(*[self.draw_one(x) for x in to_draw])
+                
+    
+    async def draw_one(
+        self, item: Drawable
+    ) -> tuple[ndarray,ndarray]:
+        item_mask = np.zeros_like(item.frame)
+        if len(item.translation.text.strip()) <= 0:
+            return (item.frame,item_mask)
 
-        frame_h, frame_w, _ = frame.shape
+        frame_h, frame_w, _ = item.frame.shape
 
         # fill background incase of segmentation errors
         # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
@@ -46,7 +54,7 @@ class HorizontalDrawer(Drawer):
         hyphenator = Hyphenator("en_US")
 
         font_size, chars_per_line, line_height, iters = get_best_font_size(
-            translation.text,
+            item.translation.text,
             (frame_w, frame_h),
             font_file=self.font_file,
             space_between_lines=self.line_spacing,
@@ -56,19 +64,24 @@ class HorizontalDrawer(Drawer):
         )
 
         if not font_size:
-            return frame
-
-        frame_as_pil = cv2_to_pil(frame)
+            return (item.frame,item_mask)
 
         font = ImageFont.truetype(self.font_file, font_size)
 
         draw_x = 0
         draw_y = 0
 
-        wrapped = wrap_text(translation.text, chars_per_line, hyphenator=hyphenator)
+        wrapped = wrap_text(item.translation.text, chars_per_line, hyphenator=hyphenator)
+
+        frame_as_pil = cv2_to_pil(item.frame)
+
+        mask_as_pil = cv2_to_pil(item_mask)
 
         image_draw = ImageDraw.Draw(frame_as_pil)
 
+        mask_draw = ImageDraw.Draw(mask_as_pil)
+
+        stroke_width = 2
         for line_no in range(len(wrapped)):
             line = wrapped[line_no]
             x, y, w, h = font.getbbox(line)
@@ -92,13 +105,39 @@ class HorizontalDrawer(Drawer):
                     + (self.line_spacing * line_no),
                 ),
                 str(line),
-                fill=(*draw_color, 255),
+                fill=(*item.color, 255),
                 font=font,
-                stroke_width=2,
+                stroke_width=stroke_width,
                 stroke_fill=(255, 255, 255),
             )
 
-        return pil_to_cv2(frame_as_pil)
+            mask_draw.text(
+                (
+                    draw_x + abs(((frame_w - w) / 2)),
+                    draw_y
+                    + self.line_spacing
+                    + (
+                        (
+                            frame_h
+                            - (
+                                (len(wrapped) * line_height)
+                                + (len(wrapped) * self.line_spacing)
+                            )
+                        )
+                        / 2
+                    )
+                    + (line_no * line_height)
+                    + (self.line_spacing * line_no),
+                ),
+                str(line),
+                fill=(255, 255, 255, 255),
+                font=font,
+                stroke_width=stroke_width,
+                stroke_fill=(255, 255, 255),
+            )
+
+        return (pil_to_cv2(frame_as_pil),pil_to_cv2(mask_as_pil))
+        
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:

@@ -14,8 +14,8 @@ class CleanOcr(Ocr):
     def __init__(self) -> None:
         super().__init__()
 
-    async def do_ocr(self, text: numpy.ndarray):
-        return OcrResult("", "")
+    async def do_ocr(self, texts: list[numpy.ndarray]):
+        return [OcrResult("", "") for _ in texts]
 
     @staticmethod
     def get_name() -> str:

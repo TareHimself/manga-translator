@@ -7,6 +7,14 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
+torch = { version = "2.0.1", source="torch"}
+torchvision = { version = "0.15.2", source="torch"}
+
+[[tool.poetry.source]]
+name = "torch"
+url = "https://download.pytorch.org/whl/cu117"
+secondary = true
+
 # ultralytics = "^8.0.118"
 # pillow = "^9.5.0"
 # pyhyphen = "^4.0.3"

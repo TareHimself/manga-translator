@@ -1,4 +1,6 @@
+import torch
 from transformers import pipeline
+from translator.utils import get_torch_device
 from translator.core.plugin import (
     Translator,
     TranslatorResult,
@@ -13,13 +15,19 @@ class HuggingFace(Translator):
 
     def __init__(self, model_url: str = "Helsinki-NLP/opus-mt-ja-en") -> None:
         super().__init__()
-        self.pipeline = pipeline("translation", model=model_url)
+        print("Using model",model_url)
+        self.pipeline = pipeline("translation", model=model_url, device=get_torch_device())
 
-    async def translate(self, ocr_result: OcrResult):
-        if len(ocr_result.text.strip()) == 0:
-            return TranslatorResult()
+        # if torch.cuda.is_available():
+        #     self.pipeline.cuda()
+        # elif torch.backends.mps.is_available():
+        #     self.pipeline.to('mps')
 
-        return TranslatorResult(self.pipeline(ocr_result.text)[0]["translation_text"])
+    async def translate(self, ocr_results: list[OcrResult]):
+        #return [print(y) for y in self.pipeline([x.text for x in ocr_results])]
+
+
+        return [TranslatorResult(y["translation_text"]) for y in self.pipeline([x.text for x in ocr_results])]
 
     @staticmethod
     def get_name() -> str:
@@ -32,6 +40,6 @@ class HuggingFace(Translator):
                 id="model_url",
                 name="Model",
                 description="The Hugging Face translation model to use",
-                default="staka/fugumt-ja-en",
+                default="Helsinki-NLP/opus-mt-ja-en",
             )
         ]

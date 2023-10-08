@@ -24,12 +24,12 @@ class TesseractOcr(Ocr):
         self.tesseract = pytesseract
         self.language = language
 
-    async def do_ocr(self, text: numpy.ndarray):
+    async def do_ocr(self, texts: list[numpy.ndarray]):
         print("Using Tesseract OCR")
-        return OcrResult(
-            text=self.tesseract.image_to_string(text, lang=self.language),
+        return [OcrResult(
+            text=self.tesseract.image_to_string(x, lang=self.language),
             language=simplify_lang_code(self.language),
-        )
+        ) for x in texts]
 
     @staticmethod
     def get_name() -> str:

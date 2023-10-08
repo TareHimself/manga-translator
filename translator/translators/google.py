@@ -27,20 +27,18 @@ class GoogleTranslateTranslator(Translator):
         else:
             self.trans = None
 
-    async def translate(self, ocr_result: OcrResult):
+    
+    async def translate(self, ocr_results: list[OcrResult]):
         if self.trans is None:
-            return TranslatorResult("Invalid Key Path")
+            return [TranslatorResult("Invalid Key Path") for _ in ocr_results]
 
-        if len(ocr_result.text.strip()) == 0:
-            return TranslatorResult()
-
-        return TranslatorResult(
+        return [TranslatorResult(
             self.trans.translate(
-                ocr_result.text,
-                source_language=ocr_result.language,
+                x.text,
+                source_language=x.language,
                 target_language="en",
             )["translatedText"]
-        )
+        ) for x in ocr_results]
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:

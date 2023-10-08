@@ -1,5 +1,5 @@
 import numpy as np
-from translator.utils import resize_and_pad, display_image
+from translator.utils import run_in_thread_decorator
 
 class PluginArgumentType:
     TEXT = 0
@@ -90,11 +90,11 @@ class Ocr(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
-    async def __call__(self, text: np.ndarray) -> OcrResult:
-        return await self.do_ocr(text)
+    async def __call__(self, texts: list[np.ndarray]) -> list[OcrResult]:
+        return await self.do_ocr(texts)
 
-    async def do_ocr(self, text: np.ndarray):
-        return OcrResult("Sample")
+    async def do_ocr(self, texts: list[np.ndarray]):
+        return [OcrResult("Sample") for _ in texts]
 
     @staticmethod
     def get_name() -> str:
@@ -113,30 +113,36 @@ class Translator(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
-    async def __call__(self, ocr_result: OcrResult) -> str:
-        return await self.translate(ocr_result)
+    async def __call__(self, ocr_results: list[OcrResult]) -> list[TranslatorResult]:
+        return await self.translate(ocr_results)
 
-    async def translate(self, ocr_result: OcrResult) -> TranslatorResult:
-        return TranslatorResult(ocr_result.text)
+    async def translate(self, ocr_results: list[OcrResult]) -> list[TranslatorResult]:
+        return [TranslatorResult(x.text) for x in ocr_results]
 
     @staticmethod
     def get_name() -> str:
         return "Base Translator"
 
+class Drawable:
+    def __init__(self,color: np.ndarray, translation: TranslatorResult,frame: np.ndarray) -> None:
+        self.color = color
+        self.translation = translation
+        self.frame = frame
 
 class Drawer(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
+
     async def draw(
-        self, draw_color: np.ndarray, translation: TranslatorResult, frame: np.ndarray
-    ) -> np.ndarray:
-        return frame
+        self, to_draw: list[Drawable]
+    ) -> list[tuple[np.ndarray,np.ndarray]]:
+        return [x.frame for x in to_draw]
 
     async def __call__(
-        self, draw_color: np.ndarray, translation: TranslatorResult, frame: np.ndarray
-    ) -> np.ndarray:
-        return await self.draw(draw_color=draw_color, translation=translation, frame=frame)
+        self, to_draw: list[Drawable]
+    ) -> list[tuple[np.ndarray,np.ndarray]]:
+        return await self.draw(to_draw=to_draw)
 
 
 class Cleaner(BasePlugin):
