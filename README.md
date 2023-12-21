@@ -49,7 +49,7 @@
 - Run the following in the terminal to create an enviroment
 
 ```py
-conda create -n manga-translator python=3.9.12
+conda create -n manga-translator python=3.10
 conda activate manga-translator
 ```
 
@@ -58,11 +58,10 @@ conda activate manga-translator
 
 ```bash
 poetry install
-poe install-deps
 # For cuda support run "poe force-cuda"
 ```
 
-- Download models to models/modelname (i.e. models/detection.py)
+- Download models to models/modelname (i.e. models/detection.pt)
 - If you plan to use the UI also install [NodeJS](https://nodejs.org/en)
 
 ## Run
@@ -76,7 +75,7 @@ poe run-server
 ### CLI
 
 ```bash
-python main.py -m [live|convert -f "files"]
+python main.py -m -f image1.png image2.png
 ```
 
 ## Datasets
