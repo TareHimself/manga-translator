@@ -1013,9 +1013,9 @@ def generate_color_detection_train_example(
 
     draw_text_color = generator.choice(
         [
-            np.array(rand_color(generator)),
-            np.array((0, 0, 0)),
-            np.array((255, 255, 255)),
+            np.array(rand_color(generator),dtype=np.uint8),
+            np.array((0, 0, 0),dtype=np.uint8),
+            np.array((255, 255, 255),dtype=np.uint8),
         ]
     )  # random color, white or black
 
@@ -1034,7 +1034,7 @@ def generate_color_detection_train_example(
         rotation=generator.choice(rotation_angles),
     )
 
-    return frame_drawn, draw_text_color
+    return frame_drawn, draw_text_color, (np.array(outline_color,dtype=np.uint8) if outline_color is not None else draw_text_color)
 
 
 torch_sample_transformer = transforms.Compose(

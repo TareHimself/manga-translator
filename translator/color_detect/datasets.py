@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 import math
+import numpy as np
 from ..utils import generate_color_detection_train_example, transform_sample
 
 
@@ -65,7 +66,7 @@ class ColorDetectionDataset(Dataset):
                 if stop_threads_event.is_set():
                     break
 
-                example, label = generate_color_detection_train_example(
+                example, text_fg,text_bg = generate_color_detection_train_example(
                     phrase,
                     background=generator.choice(backgrounds)
                     if has_extra_backgrounds
@@ -83,7 +84,7 @@ class ColorDetectionDataset(Dataset):
                 # debug_image(example,"Generated sample")
                 # executor.submit(add_sample,label,example)
                 self.examples.append(example)
-                self.labels.append(label / 255)
+                self.labels.append((np.concatenate([text_fg,text_bg])).astype(np.float32) / 255)
                 loader.update()
                 num_generated += 1
 

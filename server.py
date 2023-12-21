@@ -15,7 +15,7 @@ from translator.pipelines import FullConversion
 from translator.translators.get import get_translators
 from translator.translators.deepl import DeepLTranslator
 from translator.ocr.get import get_ocr
-from translator.ocr.clean import CleanOcr
+from translator.ocr.no import NoOcr
 from translator.ocr.huggingface_ja import JapaneseOcr
 from translator.drawers.get import get_drawers
 from translator.cleaners.get import get_cleaners
@@ -90,7 +90,7 @@ class CleanFromWebHandler(RequestHandler):
             )
             image_cv2 = pil_to_cv2(Image.open(io.BytesIO(image[0]["body"])))
             converter = FullConversion(
-                ocr=CleanOcr(), cleaner=get_cleaners()[cleaner_id](**cleaner_params)
+                ocr=NoOcr(), cleaner=get_cleaners()[cleaner_id](**cleaner_params)
             )
             results = await converter([image_cv2])
             converted_pil = cv2_to_pil(results[0])
@@ -143,7 +143,7 @@ class TranslateFromWebHandler(RequestHandler):
                 ocr=get_ocr()[ocr_id](**ocr_params),
                 drawer=get_drawers()[drawer_id](**drawer_params),
                 cleaner=get_cleaners()[cleaner_id](**cleaner_params),
-                color_detect_model=None,
+                # color_detect_model=None,
             )
 
             results = await converter([image_cv2])
@@ -343,5 +343,5 @@ async def main():
     webbrowser.open(f"http://localhost:{app_port}")
     await asyncio.Event().wait()
 
-
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

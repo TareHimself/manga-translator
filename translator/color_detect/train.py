@@ -16,7 +16,9 @@ def train_model(
     learning_rate=0.0001,
     weights_path=None,
     seed=200,
-    train_device=torch.device("cuda:0"),
+    patience = 50,
+    use_fp16 = True,
+    device=torch.device("cuda:0"),
 ):
     dataset = ColorDetectionDataset(
         generate_target=num_samples,
@@ -27,18 +29,16 @@ def train_model(
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model = get_color_detection_model(weights_path=weights_path, device=train_device)
+    model = get_color_detection_model(weights_path=weights_path, device=device)
 
     criterion = nn.MSELoss()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-    scaler = torch.cuda.amp.grad_scaler.GradScaler()
+    scaler = torch.cuda.amp.grad_scaler.GradScaler() if use_fp16 else None
 
-    best_loss = 99999999999
-    best_epoch = 0
-    patience = 20
-    patience_count = 0
+    best_loss = None
+    best_epoch = -1
 
     best_state = copy.deepcopy(model.state_dict())
 
@@ -49,19 +49,31 @@ def train_model(
             running_loss = 0
             for idx, data in enumerate(dataloader):
                 images, results = data
-                images = images.type(torch.FloatTensor).to(train_device)
-                results = results.type(torch.FloatTensor).to(train_device)
+                images = images.type(torch.FloatTensor).to(device)
+                results = results.type(torch.FloatTensor).to(device)
 
-                with torch.cuda.amp.autocast_mode.autocast():
+                if use_fp16:
+                    # Do we still need autocasting
+                    with torch.cuda.amp.autocast_mode.autocast():
+                        outputs: torch.Tensor = model(images)
+
+                        loss = criterion(outputs, results)
+
+                    optimizer.zero_grad()
+
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
                     outputs: torch.Tensor = model(images)
 
                     loss = criterion(outputs, results)
 
-                optimizer.zero_grad()
+                    optimizer.zero_grad()
 
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
+                    loss.backward()
+
+                    optimizer.step()
 
                 # Calculate the element-wise distance between the arrays
                 distance = torch.abs(results - outputs)
@@ -69,7 +81,7 @@ def train_model(
                 # Set a threshold value for considering the elements as accurate
                 threshold = 0.1
 
-                # Calculate the accuracy
+                # Calculate the accuracy | This may not be a good measure of accracy
                 total_accu += (distance <= threshold).float().mean().item()
                 total_count += 1
                 running_loss += loss.item() * images.size(0)
@@ -84,10 +96,13 @@ def train_model(
             loading_bar.close()
             epoch_loss = running_loss / len(dataloader.dataset)
             epoch_accu = (total_accu / total_count) * 100
-            if epoch_loss < best_loss:
+            if best_loss is None or epoch_loss < best_loss:
                 best_loss = epoch_loss
                 best_state = copy.deepcopy(model.state_dict())
                 best_epoch = epoch
+
+            if epoch - best_epoch > patience:
+                break
 
     except KeyboardInterrupt:
         print("Stopping training early at user request")

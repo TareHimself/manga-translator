@@ -8,7 +8,7 @@ from translator.core.plugin import (
     PluginSelectArgument,
     PluginSelectArgumentOption,
 )
-
+from translator.utils import display_image, resize_and_pad, ensure_gray, adjust_contrast_brightness
 
 class TesseractOcr(Ocr):
     """Supports all the languages listed"""
@@ -23,13 +23,14 @@ class TesseractOcr(Ocr):
         super().__init__()
         self.tesseract = pytesseract
         self.language = language
+    
 
-    async def do_ocr(self, texts: list[numpy.ndarray]):
-        print("Using Tesseract OCR")
+    async def do_ocr(self, batch: list[numpy.ndarray]):
+
         return [OcrResult(
             text=self.tesseract.image_to_string(x, lang=self.language),
             language=simplify_lang_code(self.language),
-        ) for x in texts]
+        ) for x in batch]
 
     @staticmethod
     def get_name() -> str:

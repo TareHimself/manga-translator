@@ -1,4 +1,5 @@
 from typing import Any
+import cv2
 import numpy as np
 from PIL import ImageFont, ImageDraw
 from numpy import ndarray
@@ -18,6 +19,8 @@ from translator.utils import (
     pil_to_cv2,
     wrap_text,
     get_fonts,
+    luminance_similarity,
+    display_image
 )
 
 
@@ -33,9 +36,9 @@ class HorizontalDrawer(Drawer):
         self.line_spacing = round(float(line_spacing))
 
     async def draw(
-        self,to_draw: list[Drawable]
+        self,batch: list[Drawable]
     ) -> list[tuple[ndarray,ndarray]]:
-        return await asyncio.gather(*[self.draw_one(x) for x in to_draw])
+        return await asyncio.gather(*[self.draw_one(x) for x in batch])
                 
     
     async def draw_one(
@@ -68,20 +71,23 @@ class HorizontalDrawer(Drawer):
 
         font = ImageFont.truetype(self.font_file, font_size)
 
+        font
         draw_x = 0
         draw_y = 0
 
         wrapped = wrap_text(item.translation.text, chars_per_line, hyphenator=hyphenator)
 
         frame_as_pil = cv2_to_pil(item.frame)
-
+        
         mask_as_pil = cv2_to_pil(item_mask)
 
         image_draw = ImageDraw.Draw(frame_as_pil)
 
         mask_draw = ImageDraw.Draw(mask_as_pil)
 
-        stroke_width = 2
+        stroke_width = 2 if luminance_similarity(item.color[0],item.color[1]) < 0.6 else 0
+        # print("SIMILARITY",luminance_similarity(item.color[0],item.color[1]),item.color)
+        # print("DRAWING",item.translation.text)
         for line_no in range(len(wrapped)):
             line = wrapped[line_no]
             x, y, w, h = font.getbbox(line)
@@ -105,10 +111,10 @@ class HorizontalDrawer(Drawer):
                     + (self.line_spacing * line_no),
                 ),
                 str(line),
-                fill=(*item.color, 255),
+                fill=(*item.color[0],255),
                 font=font,
                 stroke_width=stroke_width,
-                stroke_fill=(255, 255, 255),
+                stroke_fill=(*item.color[1],255),
             )
 
             mask_draw.text(
@@ -136,7 +142,11 @@ class HorizontalDrawer(Drawer):
                 stroke_fill=(255, 255, 255),
             )
 
-        return (pil_to_cv2(frame_as_pil),pil_to_cv2(mask_as_pil))
+        mask_cv2 = pil_to_cv2(mask_as_pil)
+
+        ret,mask_cv2 = cv2.threshold(mask_cv2,127,255,cv2.THRESH_BINARY) # If this is not done mask will not work properly
+
+        return (pil_to_cv2(frame_as_pil),mask_cv2)
         
 
     @staticmethod

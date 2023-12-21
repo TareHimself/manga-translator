@@ -3,7 +3,6 @@ runs
 *.pyc
 .DS_Store
 datasets/*
-*.lock
 *.pt
 *.pth
 
