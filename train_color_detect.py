@@ -10,11 +10,13 @@ from translator.utils import transform_sample
 
 pytorch_device = torch.device("cuda:0")
 
-backgrounds = [cv2.imread(f"./backgrounds/{x}") for x in
-               os.listdir("./backgrounds")]  # some background noise for the dataset
+backgrounds = [cv2.imread(f"./assets/backgrounds/{x}") for x in
+               os.listdir("./assets/backgrounds")]  # some background noise for the dataset
 
-model = train_model(epochs=10000, backgrounds=backgrounds, seed=30, train_device=pytorch_device, num_samples=10000,
-                    num_workers=1, weights_path="models/color_detection.pt")  # trains then returns the trained model
+model = train_model(epochs=10000, backgrounds=backgrounds, seed=30, device=pytorch_device, num_samples=30000,
+                    num_workers=1)#, weights_path="models/color_detection.pt")  # trains then returns the trained model
+
+model = model.to(torch.device('cpu'))
 
 torch.save(model.state_dict(), "trained.pt")
 
@@ -33,15 +35,15 @@ with torch.no_grad():
         while True:
             try:
                 text = " ".join([fake_en.name() for x in range(gen.randint(1, 4))])
-                example, label = generate_color_detection_train_example(text, size=(100, 200),
+                example, text_fg, text_bg = generate_color_detection_train_example(text, size=(100, 200),
                                                                         background=gen.choice(backgrounds),
                                                                         generator=gen, font_file="fonts/reiko.ttf")
                 to_eval = example.copy()
                 to_eval = transform_sample(to_eval).unsqueeze(0).type(torch.FloatTensor).to(pytorch_device)
                 results = model(to_eval)[0]
                 color = np.array(results.cpu().numpy() * 255, dtype=np.int32)
-                print("Detected color", color)
-                print("Actual color", label)
+                print("Detected color", color[0:3],color[3:])
+                print("Actual color", text_fg,text_bg)
                 display_image(example, "Test Frame")
             except KeyboardInterrupt:
                 break

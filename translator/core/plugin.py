@@ -90,11 +90,11 @@ class Ocr(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
-    async def __call__(self, texts: list[np.ndarray]) -> list[OcrResult]:
-        return await self.do_ocr(texts)
+    async def __call__(self, batch: list[np.ndarray]) -> list[OcrResult]:
+        return await self.do_ocr(batch)
 
-    async def do_ocr(self, texts: list[np.ndarray]):
-        return [OcrResult("Sample") for _ in texts]
+    async def do_ocr(self, batch: list[np.ndarray]):
+        return [OcrResult("Sample") for _ in batch]
 
     @staticmethod
     def get_name() -> str:
@@ -113,18 +113,18 @@ class Translator(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
-    async def __call__(self, ocr_results: list[OcrResult]) -> list[TranslatorResult]:
-        return await self.translate(ocr_results)
+    async def __call__(self, batch: list[OcrResult]) -> list[TranslatorResult]:
+        return await self.translate(batch)
 
-    async def translate(self, ocr_results: list[OcrResult]) -> list[TranslatorResult]:
-        return [TranslatorResult(x.text) for x in ocr_results]
+    async def translate(self, batch: list[OcrResult]) -> list[TranslatorResult]:
+        return [TranslatorResult(x.text) for x in batch]
 
     @staticmethod
     def get_name() -> str:
         return "Base Translator"
 
 class Drawable:
-    def __init__(self,color: np.ndarray, translation: TranslatorResult,frame: np.ndarray) -> None:
+    def __init__(self,color: tuple[np.ndarray,np.ndarray], translation: TranslatorResult,frame: np.ndarray) -> None:
         self.color = color
         self.translation = translation
         self.frame = frame
@@ -135,14 +135,14 @@ class Drawer(BasePlugin):
 
 
     async def draw(
-        self, to_draw: list[Drawable]
+        self, batch: list[Drawable]
     ) -> list[tuple[np.ndarray,np.ndarray]]:
-        return [x.frame for x in to_draw]
+        return [x.frame for x in batch]
 
     async def __call__(
-        self, to_draw: list[Drawable]
+        self, batch: list[Drawable]
     ) -> list[tuple[np.ndarray,np.ndarray]]:
-        return await self.draw(to_draw=to_draw)
+        return await self.draw(batch=batch)
 
 
 class Cleaner(BasePlugin):

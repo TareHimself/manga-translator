@@ -23,11 +23,10 @@ class HuggingFace(Translator):
         # elif torch.backends.mps.is_available():
         #     self.pipeline.to('mps')
 
-    async def translate(self, ocr_results: list[OcrResult]):
-        #return [print(y) for y in self.pipeline([x.text for x in ocr_results])]
+    async def translate(self, batch: list[OcrResult]):
+        #return [print(y) for y in self.pipeline([x.text for x in batch])]
 
-
-        return [TranslatorResult(y["translation_text"]) for y in self.pipeline([x.text for x in ocr_results])]
+        return [TranslatorResult(y["translation_text"]) for y in self.pipeline([x.text for x in batch])]
 
     @staticmethod
     def get_name() -> str:

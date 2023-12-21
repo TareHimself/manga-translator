@@ -49,18 +49,18 @@ class OpenAiTranslator(Translator):
             result["choices"][0].message["content"].strip(), self.target_lang
         )
     
-    async def translate(self, ocr_results: list[OcrResult]):
-        if len(ocr_results) == 0:
-            return [TranslatorResult(lang_code=self.target_lang) for _ in ocr_results]
+    async def translate(self, batch: list[OcrResult]):
+        if len(batch) == 0:
+            return [TranslatorResult(lang_code=self.target_lang) for _ in batch]
         
 
-        return await asyncio.gather(*[self.translate_one(x) for x in ocr_results])
+        return await asyncio.gather(*[self.translate_one(x) for x in batch])
 
         
 
     @staticmethod
     def get_name() -> str:
-        return "GPT Translator"
+        return "Open AI"
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:

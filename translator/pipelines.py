@@ -4,6 +4,7 @@ import numpy as np
 import sys
 from ultralytics import YOLO
 from translator.utils import (
+    display_image,
     get_outline_color,
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
@@ -52,20 +53,25 @@ class FullConversion:
         self,
         detect_model: str = get_model_path("detection.pt"),
         seg_model: str = get_model_path("segmentation.pt"),
-        color_detect_model: Union[str, None] = get_model_path("color_detection.pt"),
+        color_detect_model: Union[str, None] = None, #get_model_path("color_detection.pt") # Performance is not where I would like it to be at,
         translator: Translator = Translator(),
         ocr: Ocr = Ocr(),
         drawer: Drawer = HorizontalDrawer(),
         cleaner: Cleaner = DeepFillV2Cleaner(),
         translate_free_text: bool = False,
+        device=torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu"),
+        yolo_device=0 if torch.cuda.is_available() else "cpu",
         debug=False,
     ) -> None:
+        self.device = device
+        print("Pipeline created using",device)
+        self.yolo_device = yolo_device
         self.segmentation_model = YOLO(seg_model)
         self.detection_model = YOLO(detect_model)
         try:
             if color_detect_model is not None:
                 self.color_detect_model = get_color_detection_model(
-                    weights_path=color_detect_model, device=torch.device("cuda:0")
+                    weights_path=color_detect_model, device=self.device
                 )
                 self.color_detect_model.eval()
             else:
@@ -144,9 +150,6 @@ class FullConversion:
         print(f"Inpainting => {time.time() - start} seconds")
 
         return frame, frame_clean, text_mask, detect_result
-
-    async def get_translation(self, image_with_text, extra_data):
-        return (await self.translator(await self.ocr(image_with_text)), *extra_data)
 
     @run_in_thread_decorator
     async def process_frame(self, detect_result, seg_result, frame):
@@ -310,7 +313,7 @@ class FullConversion:
             # print("intersection found")
 
             # third pass, draw text
-            draw_colors = [TranslatorGlobals.COLOR_BLACK for x in to_translate]
+            draw_colors = [(TranslatorGlobals.COLOR_BLACK,TranslatorGlobals.COLOR_BLACK) for x in to_translate]
 
             start = time.time()
             if self.color_detect_model is not None and len(draw_colors) > 0:
@@ -335,14 +338,14 @@ class FullConversion:
                             # images = [x[2].copy() for x in to_translate]
                             # [display_image(x,"To Detect") for x in images]
 
-                            draw_colors = [
+                            draw_colors = [(y[:3],y[3:]) for y in [
                                 (x.cpu().numpy() * 255).astype(np.uint8)
                                 for x in self.color_detect_model(
                                     torch.stack([transform_sample(y) for y in images]).to(
                                         torch.device("cuda:0")
                                     )
                                 )
-                            ]
+                            ]]
             else:
                 print("Using black since color detect model is 'None'")
 
@@ -356,7 +359,7 @@ class FullConversion:
             if self.translator and self.ocr and len(to_translate) > 0:
                 bboxes,images = zip(*to_translate)
 
-                ocr_results = await self.ocr(images)
+                ocr_results = await self.ocr(list(images))
 
                 translation_results = await self.translator(ocr_results)
 
@@ -386,7 +389,12 @@ class FullConversion:
 
                     drawn_frame,drawn_frame_mask = drawn_frame
 
-                    frame[y1:y2, x1:x2] = apply_mask(frame[y1:y2,x1:x2],drawn_frame,drawn_frame_mask)
+                    #frame[y1:y2, x1:x2] = drawn_frame#apply_mask(frame[y1:y2, x1:x2],drawn_frame,drawn_frame_mask)
+                    frame[y1:y2, x1:x2] = apply_mask(frame[y1:y2, x1:x2],drawn_frame,drawn_frame_mask)
+
+                    # display_image(drawn_frame_mask,"Mask")
+                    # display_image(drawn_frame,"Text")
+                    # display_image(frame[y1:y2, x1:x2],"Masked")
 
                 print(f"Drawing => {time.time() - start} seconds")
             return frame
@@ -397,11 +405,6 @@ class FullConversion:
     async def __call__(
         self,
         images: list[np.ndarray],
-        yolo_device=0
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0
-        else "mps"
-        if sys.platform != "darwin"
-        else torch.device("cpu"),
     ) -> list[np.ndarray]:
         # frames = [resize_percent(x, 50) for x in frames]
         total_start = time.time()
@@ -409,8 +412,8 @@ class FullConversion:
         to_process = [
             x
             for x in zip(
-                self.detection_model(images, device=yolo_device, verbose=False),
-                self.segmentation_model(images, device=yolo_device, verbose=False),
+                self.detection_model(images, device=self.yolo_device, verbose=False),
+                self.segmentation_model(images, device=self.yolo_device, verbose=False),
                 images,
             )
         ]

@@ -14,12 +14,12 @@ class DebugTranslator(Translator):
         super().__init__()
         self.to_write = text
 
-    async def translate(self, ocr_results: list[OcrResult]):
-        return [TranslatorResult(self.to_write) for _ in ocr_results]
+    async def translate(self, batch: list[OcrResult]):
+        return [TranslatorResult(self.to_write) for _ in batch]
 
     @staticmethod
     def get_name() -> str:
-        return "Debug Translator"
+        return "Custom Text"
 
     @staticmethod
     def get_arguments() -> list[PluginArgument]:

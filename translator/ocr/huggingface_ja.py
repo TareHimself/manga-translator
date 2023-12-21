@@ -14,10 +14,10 @@ class JapaneseOcr(Ocr):
         super().__init__()
         self.pipeline = pipeline("image-to-text", model=model, device=get_torch_device())
     
-    async def do_ocr(self, texts: list[numpy.ndarray]):
+    async def do_ocr(self, batch: list[numpy.ndarray]):
 
         with torch.inference_mode():
-            frames = [cv2_to_pil(x).convert('L').convert('RGB') for x in texts]
+            frames = [cv2_to_pil(x).convert('L').convert('RGB') for x in batch]
             results = self.pipeline(frames,max_new_tokens=300)
 
             return [OcrResult(self._post_process(x[0]['generated_text']), "ja") for x in results]
