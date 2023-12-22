@@ -53,7 +53,7 @@ class FullConversion:
         self,
         detect_model: str = get_model_path("detection.pt"),
         seg_model: str = get_model_path("segmentation.pt"),
-        color_detect_model: Union[str, None] = None, #get_model_path("color_detection.pt") # Performance is not where I would like it to be at,
+        color_detect_model: Union[str, None] = get_model_path("color_detection.pt"), # Performance is not where I would like it to be at,
         translator: Translator = Translator(),
         ocr: Ocr = Ocr(),
         drawer: Drawer = HorizontalDrawer(),
@@ -388,13 +388,16 @@ class FullConversion:
                     # outline_color = get_outline_color(draw_frame, draw_color)
 
                     drawn_frame,drawn_frame_mask = drawn_frame
-
+                    #print("SHAPE",drawn_frame_mask.shape)
                     #frame[y1:y2, x1:x2] = drawn_frame#apply_mask(frame[y1:y2, x1:x2],drawn_frame,drawn_frame_mask)
-                    frame[y1:y2, x1:x2] = apply_mask(frame[y1:y2, x1:x2],drawn_frame,drawn_frame_mask)
-
                     # display_image(drawn_frame_mask,"Mask")
                     # display_image(drawn_frame,"Text")
-                    # display_image(frame[y1:y2, x1:x2],"Masked")
+                    # display_image(cv2.bitwise_not(drawn_frame_mask),"BITWISE")
+                    # display_image(cv2.bitwise_and(drawn_frame, drawn_frame, mask=drawn_frame_mask),"Masked1")
+                    # display_image(cv2.bitwise_and(frame[y1:y2, x1:x2], frame[y1:y2, x1:x2], mask=cv2.bitwise_not(drawn_frame_mask)),"Masked2")
+                    frame[y1:y2, x1:x2] = apply_mask(drawn_frame,frame[y1:y2, x1:x2],drawn_frame_mask)
+
+                    
 
                 print(f"Drawing => {time.time() - start} seconds")
             return frame
