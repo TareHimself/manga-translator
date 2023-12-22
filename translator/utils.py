@@ -162,9 +162,9 @@ def ensure_gray(img: np.ndarray):
     return img.copy()
 
 
-def apply_mask(a: np.ndarray, b: np.ndarray, mask: np.ndarray, inv=False):
+def apply_mask(foreground: np.ndarray, background: np.ndarray, mask: np.ndarray, inv=False):
     mask = ensure_gray(mask)
-    a_loc, b_loc = a.copy(), b.copy()
+    a_loc, b_loc = foreground.copy(), background.copy()
     mask_inv = cv2.bitwise_not(mask)
 
     if inv:
@@ -172,8 +172,8 @@ def apply_mask(a: np.ndarray, b: np.ndarray, mask: np.ndarray, inv=False):
         mask = mask_inv
         mask_inv = temp
 
-    a_loc = cv2.bitwise_and(a_loc, a_loc, mask=mask_inv)
-    b_loc = cv2.bitwise_and(b_loc, b_loc, mask=mask)
+    a_loc = cv2.bitwise_and(a_loc, a_loc, mask=mask)
+    b_loc = cv2.bitwise_and(b_loc, b_loc, mask=mask_inv)
     return cv2.add(a_loc, b_loc)
 
 
@@ -271,7 +271,6 @@ def mask_text_and_make_bubble_mask(
         frame_section,
         np.full(frame_section.shape, 255, dtype=frame_section.dtype),
         mask_section,
-        True,
     )
 
     return text, make_bubble_mask(frame_cleaned)
@@ -283,9 +282,6 @@ def cv2_to_pil(img: np.ndarray) -> Image:
 
 def pil_to_cv2(img: Image) -> np.ndarray:
     arr = np.array(img)
-
-    if len(arr.shape) == 2:
-        return cv2.cvtColor(np.array(img), cv2.COLOR_GRAY2BGR)
 
     if len(arr.shape) > 2 and arr.shape[2] == 4:
         return cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGR)
@@ -515,7 +511,7 @@ async def in_paint_optimized(
             )
 
             region_mask = apply_mask(
-                region_mask, np.zeros_like(region_mask), focus_mask, True
+                region_mask, np.zeros_like(region_mask), focus_mask
             )
 
             if has_white(region_mask):
@@ -880,7 +876,7 @@ def draw_text_in_bubble(
             rotated_mask = cv2.dilate(rotated_mask, kernel, iterations=1)
             rotated_mask = adjust_contrast_brightness(rotated_mask, 50, 200)
 
-        return apply_mask(rotated_frame, frame, rotated_mask, inv=True)
+        return apply_mask(rotated_frame, frame, rotated_mask)
     else:
         return frame
 

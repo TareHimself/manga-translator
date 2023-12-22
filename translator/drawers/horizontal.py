@@ -85,7 +85,7 @@ class HorizontalDrawer(Drawer):
 
         mask_draw = ImageDraw.Draw(mask_as_pil)
 
-        stroke_width = 2 if luminance_similarity(item.color[0],item.color[1]) < 0.6 else 0
+        stroke_width = 2 if luminance_similarity(item.color[0],item.color[1]) < 0.7 else 0
         # print("SIMILARITY",luminance_similarity(item.color[0],item.color[1]),item.color)
         # print("DRAWING",item.translation.text)
         for line_no in range(len(wrapped)):
@@ -114,7 +114,7 @@ class HorizontalDrawer(Drawer):
                 fill=(*item.color[0],255),
                 font=font,
                 stroke_width=stroke_width,
-                stroke_fill=(*item.color[1],255),
+                stroke_fill=(*item.color[1],255) if stroke_width > 0 else None
             )
 
             mask_draw.text(
@@ -139,14 +139,14 @@ class HorizontalDrawer(Drawer):
                 fill=(255, 255, 255, 255),
                 font=font,
                 stroke_width=stroke_width,
-                stroke_fill=(255, 255, 255),
+                stroke_fill=(255, 255, 255) if stroke_width > 0 else None
             )
 
-        mask_cv2 = pil_to_cv2(mask_as_pil)
+        mask_cv2 = cv2.cvtColor(pil_to_cv2(mask_as_pil),cv2.COLOR_BGR2GRAY)
 
-        ret,mask_cv2 = cv2.threshold(mask_cv2,127,255,cv2.THRESH_BINARY) # If this is not done mask will not work properly
+        _, binary_mask = cv2.threshold(mask_cv2, 1, 255, cv2.THRESH_BINARY)
 
-        return (pil_to_cv2(frame_as_pil),mask_cv2)
+        return (pil_to_cv2(frame_as_pil),binary_mask)
         
 
     @staticmethod
