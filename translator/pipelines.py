@@ -151,7 +151,6 @@ class FullConversion:
 
         return frame, frame_clean, text_mask, detect_result
 
-    @run_in_thread_decorator
     async def process_frame(self, detect_result, seg_result, frame):
         try:
             frame, frame_clean, text_mask, detect_result = await self.process_ml_results(

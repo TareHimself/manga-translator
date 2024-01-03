@@ -53,7 +53,7 @@ def get_color_detection_model(
     
 
     if weights_path is not None:
-        model.load_state_dict(torch.load(weights_path))
+        model.load_state_dict(torch.load(weights_path, map_location=torch.device('cpu')))
 
     model.to(device)
 

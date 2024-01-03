@@ -47,8 +47,13 @@ async def run_in_thread(func,*args,**kwargs):
 
 def run_in_thread_decorator(func):
     async def wrapper(*args,**kwargs):
-        return await run_in_thread(func,*args,**kwargs)
+        return await run_in_thread(func,*args,**kwargs) # Comment this out to disable threading
     
+
+        result = func(*args,**kwargs)
+        if inspect.isawaitable(result):
+                result = await result
+        return result
     return wrapper
 
 
@@ -430,8 +435,7 @@ def mask_text_for_in_painting(frame: np.ndarray, mask: np.ndarray):
 
     return new_mask
 
-@run_in_thread_decorator
-async def in_paint_optimized(
+def in_paint_optimized(
     frame: np.ndarray,
     mask: np.ndarray,
     filtered: list[tuple[tuple[int, int, int, int], str, float]] = [],

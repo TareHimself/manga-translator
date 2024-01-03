@@ -75,7 +75,7 @@ poe run-server
 ### CLI
 
 ```bash
-python main.py -m -f image1.png image2.png
+python main.py -f image1.png image2.png
 ```
 
 ## Datasets

@@ -22,12 +22,11 @@ class DeepFillV2Cleaner(Cleaner):
         "cuda" if torch.cuda.is_available() and torch.cuda.device_count() > 0 else "cpu"
     )
 
-    DEFAULT_MODEL_PATH = os.path.join("models", "inpainting.pth")
+    DEFAULT_MODEL_PATH = os.path.join("models", "inpainting.pt")
 
     _model = None
 
     _model_path = ""
-
     @staticmethod
     def get_model(path: str):
         if path == DeepFillV2Cleaner._model_path:
@@ -110,7 +109,7 @@ class DeepFillV2Cleaner(Cleaner):
         mask: ndarray,
         detection_results: list[tuple[tuple[int, int, int, int], str, float]] = [],
     ) -> tuple[ndarray, ndarray]:
-        return await in_paint_optimized(
+        return in_paint_optimized(
             frame,
             mask=mask,
             filtered=detection_results,  # segmentation_results.boxes.xyxy.cpu().numpy()

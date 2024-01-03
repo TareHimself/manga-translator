@@ -11,10 +11,10 @@ def get_translators() -> list[Translator]:
         filter(
             lambda a: a.is_valid(),
             [
+                DebugTranslator,
                 HuggingFace,
                 DeepLTranslator,
                 GoogleTranslateTranslator,
-                DebugTranslator,
                 OpenAiTranslator,
             ],
         )

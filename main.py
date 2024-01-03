@@ -1,6 +1,6 @@
 import argparse
 import cv2
-import sys
+import asyncio
 import os
 import math
 import re
@@ -43,7 +43,7 @@ def json_to_args(args_str: str):
     return args
 
 
-def do_convert(files: list[str], translator: int, translator_args: str, ocr: int, ocr_args: str,drawer: int, drawer_args: str):
+async def do_convert(files: list[str], translator: int, translator_args: str, ocr: int, ocr_args: str,drawer: int, drawer_args: str):
     converter = FullConversion(
         translator=get_translators()[translator](**json_to_args(translator_args)),
         ocr=get_ocr()[ocr](**json_to_args(ocr_args)),drawer=get_drawers()[drawer](**json_to_args(drawer_args)),
@@ -53,7 +53,7 @@ def do_convert(files: list[str], translator: int, translator_args: str, ocr: int
     for i in range(batches):
         files_to_convert = filenames[i * 4: (i + 1) * 4]
         for filename, data in zip(
-                files_to_convert, converter([cv2.imread(file) for file in files_to_convert])
+                files_to_convert, await converter([cv2.imread(file) for file in files_to_convert])
         ):
             frame = data
             ext = re.findall(EXTENSION_REGEX, filename)[0]
@@ -143,7 +143,7 @@ def main():
     else:
         files = args.files
         if len(files) == 1 and os.path.isdir(files[0]):
-            do_convert(
+            asyncio.run(do_convert(
                 [os.path.join(files[0], x) for x in os.listdir(files[0])],
                 args.translator,
                 args.translator_args,
@@ -151,9 +151,9 @@ def main():
                 args.ocr_args,
                 args.drawer,
                 args.drawer_args,
-            )
+            ))
         else:
-            do_convert(
+            asyncio.run(do_convert(
                 files,
                 args.translator,
                 args.translator_args,
@@ -161,7 +161,7 @@ def main():
                 args.ocr_args,
                 args.drawer,
                 args.drawer_args,
-            )
+            ))
 
 
 if __name__ == "__main__":
