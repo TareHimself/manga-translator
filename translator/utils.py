@@ -917,136 +917,22 @@ def get_image_slices(image: np.ndarray, slice_size: tuple[int, int]):
     return slices
 
 
-def random_section_from_image(
-    image: np.ndarray, section_size: tuple[int, int], generator=random.Random()
-):
-    img_h, img_w, _ = image.shape
-    section_w, section_h = section_size
-    if img_h - section_h < 0 or img_w - section_w < 0:
-        return None
-
-    x1 = generator.randint(0, img_w - section_w)
-    x2 = x1 + section_w
-    y1 = generator.randint(0, img_h - section_h)
-    y2 = y1 + section_h
-
-    return image[y1:y2, x1:x2]
 
 
-def rand_color(generator=random.Random()):
-    return (
-        generator.randint(0, 255),
-        generator.randint(0, 255),
-        generator.randint(0, 255),
-    )
+class COCO_TO_YOLO_TASK:
+    SEGMENTATION = "seg"
+    DETECTION = "detect"
 
 
-def get_average_color(surface: np.ndarray):
-    return np.array([round(x) for x in cv2.mean(surface)][0:3])
+def pad(num: int, amount=3):
+    final = f"{num}"
+    if len(final) >= amount:
+        return final
 
+    for i in range(amount - len(final)):
+        final = "0" + final
 
-def get_luminance(color: np.ndarray):
-    """Calculates luminance of a bgr color. 1 is bright, 0 is dark"""
-    b, g, r = color / 255
-
-    return (
-        (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
-    )  # https://en.wikipedia.org/wiki/Luminance_%28relative%29
-
-
-def luminance_similarity(a: np.ndarray, b: np.ndarray):
-    return 1 - abs(get_luminance(a) - get_luminance(b))
-
-
-def get_outline_color(
-    surface: np.ndarray, text_color: np.ndarray, min_outline_lum=0.35
-):
-    surface_color = get_average_color(surface)
-
-    color_white, color_black = np.array((255, 255, 255), dtype=np.uint8), np.array(
-        (0, 0, 0), dtype=np.uint8
-    )
-
-    lum_similarity = luminance_similarity(text_color, surface_color)
-
-    # debug_image(surface,"Surface")
-    if (
-        lum_similarity > min_outline_lum
-    ):  # we will most likely need an outline to not clash with the background
-        white_similarity = luminance_similarity(text_color, color_white)
-
-        if (
-            white_similarity > 0.7
-        ):  # make outline black if text is more white than black
-            return tuple([x for x in color_black])
-    else:
-        return None
-
-    return tuple([x for x in color_white])
-
-
-def generate_color_detection_train_example(
-    text: str = "Sample",
-    background: np.ndarray = None,
-    size: tuple[int, int] = (200, 200),
-    shift_max: tuple[int, int] = (20, 20),
-    rotation_angles: list[int] = [0, 90, -90, 180],
-    font_file="fonts/animeace2_reg.ttf",
-    generator=random.Random(),
-):
-    bg_choices = [
-        np.zeros((*size[::-1], 3), dtype=np.uint8),
-        np.full((*size[::-1], 3), 255, dtype=np.uint8),
-    ]
-
-    if background is not None:
-        bg_choices.append(background)
-
-    draw_surface = random_section_from_image(
-        generator.choice(bg_choices), size, generator
-    )  # background, white or black
-
-    if draw_surface is None:  # background was too small
-        draw_surface = random_section_from_image(
-            generator.choice(bg_choices[0:2]), size, generator
-        )  # white or black
-
-    draw_text_color = generator.choice(
-        [
-            np.array(rand_color(generator),dtype=np.uint8),
-            np.array((0, 0, 0),dtype=np.uint8),
-            np.array((255, 255, 255),dtype=np.uint8),
-        ]
-    )  # random color, white or black
-
-    outline_color = get_outline_color(draw_surface, draw_text_color)
-
-    frame_drawn = draw_text_in_bubble(
-        draw_surface,
-        ((0, 0), (draw_surface.shape[1], draw_surface.shape[0])),
-        text,
-        font_file=font_file,
-        color=draw_text_color,
-        outline_color=outline_color,
-        hyphenator=None,
-        outline=2,
-        offset=[generator.randint(-1 * x, x) for x in shift_max],
-        rotation=generator.choice(rotation_angles),
-    )
-
-    return frame_drawn, draw_text_color, (np.array(outline_color,dtype=np.uint8) if outline_color is not None else draw_text_color)
-
-
-torch_sample_transformer = transforms.Compose(
-    [
-        transforms.ToTensor(),
-        transforms.ToPILImage(),
-        # transforms.Resize((224, 224)),
-        transforms.Resize((80, 80)),
-        transforms.ToTensor(),
-        transforms.Normalize([0, 0, 0], [255, 255, 255]),
-    ]
-)
+    return final
 
 def resize_and_pad(cv2_image: np.ndarray,target_size: tuple[int,int],extra_padding: int = 0,pad_color: tuple[int,int,int] = (255, 255, 255),interpolation: int = cv2.INTER_CUBIC):
     image = cv2_image.copy()
@@ -1082,56 +968,6 @@ def resize_and_pad(cv2_image: np.ndarray,target_size: tuple[int,int],extra_paddi
     return cv2.copyMakeBorder(
             image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=pad_color
         )
-
-    
-
-
-
-def transform_sample(cv2_image: np.ndarray, pad_img=True):
-    image = cv2_image.copy()
-
-    if pad_img:
-        height, width = image.shape[:2]
-
-        max_dim = max(height, width) + 10
-
-        # Calculate the amount of padding needed for each dimension
-        pad_height = max_dim - height
-        pad_width = max_dim - width
-
-        # Determine the amount of padding on each side of the image
-        top = pad_height // 2
-        bottom = pad_height - top
-        left = pad_width // 2
-        right = pad_width - left
-
-        # Set the pad color to white (255)
-        pad_color = (255, 255, 255)  # White in BGR
-
-        # Pad the image with the calculated padding
-        image = cv2.copyMakeBorder(
-            image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=pad_color
-        )
-        # debug_image(image,"padded")
-
-    return torch_sample_transformer(image)
-
-
-class COCO_TO_YOLO_TASK:
-    SEGMENTATION = "seg"
-    DETECTION = "detect"
-
-
-def pad(num: int, amount=3):
-    final = f"{num}"
-    if len(final) >= amount:
-        return final
-
-    for i in range(amount - len(final)):
-        final = "0" + final
-
-    return final
-
 
 def index_images_in_dir(index: dict, path: str):
     for item in os.listdir(path):

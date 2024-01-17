@@ -30,6 +30,7 @@ unidic-lite = "^1.0.8"
 simple-lama-inpainting = "^0.1.2"
 opencv-python-headless = "^4.8.1.78"
 openai = "^1.6.0"
+vit-pytorch = "^1.6.5"
 
 [tool.poetry.dev-dependencies]
 poethepoet = "^0.20.0"

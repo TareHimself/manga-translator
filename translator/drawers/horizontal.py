@@ -19,9 +19,9 @@ from translator.utils import (
     pil_to_cv2,
     wrap_text,
     get_fonts,
-    luminance_similarity,
     display_image
 )
+from translator.color_detect.utils import luminance_similarity
 
 
 class HorizontalDrawer(Drawer):
@@ -84,8 +84,9 @@ class HorizontalDrawer(Drawer):
         image_draw = ImageDraw.Draw(frame_as_pil)
 
         mask_draw = ImageDraw.Draw(mask_as_pil)
-
-        stroke_width = 2 if luminance_similarity(item.color[0],item.color[1]) < 0.7 else 0
+        color_fg,color_bg,needs_bg = item.color
+        stroke_width = 2 if needs_bg else 0
+        stroke_width = 0 if stroke_width != 0 and luminance_similarity(item.color[0],item.color[1]) > 0.4 else stroke_width
         # print("SIMILARITY",luminance_similarity(item.color[0],item.color[1]),item.color)
         # print("DRAWING",item.translation.text)
         for line_no in range(len(wrapped)):
@@ -111,10 +112,10 @@ class HorizontalDrawer(Drawer):
                     + (self.line_spacing * line_no),
                 ),
                 str(line),
-                fill=(*item.color[0],255),
+                fill=(*color_fg,255),
                 font=font,
                 stroke_width=stroke_width,
-                stroke_fill=(*item.color[1],255) if stroke_width > 0 else None
+                stroke_fill=(*color_bg,255) if stroke_width > 0 else None
             )
 
             mask_draw.text(

@@ -3,37 +3,62 @@ from threading import Thread, Event
 from faker import Faker
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from queue import Queue
-from concurrent.futures import ThreadPoolExecutor
 import math
 import numpy as np
-from ..utils import generate_color_detection_train_example, transform_sample
+
+from translator.color_detect.constants import IMAGE_SIZE
+from translator.utils import display_image
+from .utils import generate_color_detection_train_example, apply_transforms
 
 
 class ColorDetectionDataset(Dataset):
     def __init__(
         self,
         generate_target=0,
-        generate_min_size: tuple[int, int] = (224, 224),
-        generator_size_delta: int = 300,
-        max_text_offset: tuple[int, int] = (20, 20),
-        backgrounds=[],
+        generate_size: tuple[int, int] = (IMAGE_SIZE * 2, IMAGE_SIZE * 2),
+        min_generate_size: tuple[int, int] = (round(IMAGE_SIZE / 2), round(IMAGE_SIZE / 2)),
+        backgrounds: list =[],
         generator_seed=0,
-        languages: list[str] = ["ja_JP", "en_US"],
+        languages: list[str] = ["en_US"],
         fonts: list[list[str]] = [
-            ["fonts/reiko.ttf", "fonts/msmincho.ttf"],
-            ["fonts/animeace2_reg.ttf", "fonts/BlambotClassicBB.ttf"],
+            [
+    'fonts/Roboto-MediumItalic.ttf',
+    'fonts/Roboto-Regular.ttf',
+    'fonts/Roboto-Thin.ttf',
+    'fonts/Roboto-ThinItalic.ttf',
+    'fonts/Roboto-Black.ttf',
+    'fonts/Roboto-BlackItalic.ttf',
+    'fonts/Roboto-Bold.ttf',
+    'fonts/Roboto-BoldItalic.ttf',
+    'fonts/Roboto-Italic.ttf',
+    'fonts/Roboto-Light.ttf',
+    'fonts/Roboto-LightItalic.ttf',
+    'fonts/Roboto-Medium.ttf',
+],
+[
+    'fonts/NotoSansJP-ExtraLight.ttf',
+    'fonts/NotoSansJP-Light.ttf',
+    'fonts/NotoSansJP-Medium.ttf',
+    'fonts/NotoSansJP-Regular.ttf',
+    'fonts/NotoSansJP-SemiBold.ttf',
+    'fonts/NotoSansJP-Thin.ttf',
+    'fonts/NotoSansJP-Black.ttf',
+    'fonts/NotoSansJP-Bold.ttf',
+    'fonts/NotoSansJP-ExtraBold.ttf'
+]
         ],
         num_workers=5,
     ) -> None:
         self.generate_target = generate_target
-        self.generate_size = generate_min_size
+        self.generate_size = generate_size
         self.examples = []
         self.labels = []
         self.languages = languages
         self.fonts = fonts
-        has_extra_backgrounds = len(backgrounds) > 0
+        backgrounds.append(np.zeros((*generate_size[::-1], 3), dtype=np.uint8))
+        backgrounds.append(np.full((*generate_size[::-1], 3), 255, dtype=np.uint8))
         generator = random.Random(generator_seed)
+        np.random.seed(generator_seed)
 
         faker_instances = [Faker(lang, use_weighting=False) for lang in self.languages]
         for x in faker_instances:
@@ -66,25 +91,25 @@ class ColorDetectionDataset(Dataset):
                 if stop_threads_event.is_set():
                     break
 
-                example, text_fg,text_bg = generate_color_detection_train_example(
+                example, example_color = generate_color_detection_train_example(
                     phrase,
-                    background=generator.choice(backgrounds)
-                    if has_extra_backgrounds
-                    else None,
-                    size=[
-                        generator.randint(x, x + generator_size_delta)
-                        for x in generate_min_size
-                    ],
+                    background=generator.choice(backgrounds + [(np.random.rand(*generate_size[::-1],3) * 255).astype(np.uint8)]),
+                    size=[generator.randrange(min_generate_size[0],generate_size[0]), generator.randrange(min_generate_size[0],generate_size[1])],
                     font_file=generator.choice(self.fonts[faker_index]),
-                    shift_max=max_text_offset,
+                    # shift_max=max_text_offset,
                     generator=generator,
                 )
 
+                # print(example_color)
+                # display_image(example,"SAMPLE")
                 # print(label,phrase)
                 # debug_image(example,"Generated sample")
                 # executor.submit(add_sample,label,example)
+                
                 self.examples.append(example)
-                self.labels.append((np.concatenate([text_fg,text_bg])).astype(np.float32) / 255)
+                label = example_color.astype(np.float32)
+                label[:-1] = label[:-1] / 255
+                self.labels.append(label)
                 loader.update()
                 num_generated += 1
 
@@ -115,7 +140,7 @@ class ColorDetectionDataset(Dataset):
                 break
 
         for i in tqdm(range(len(self.examples)), desc="Resizing Samples"):
-            self.examples[i] = transform_sample(self.examples[i]).numpy()
+            self.examples[i] = apply_transforms(self.examples[i]).numpy()
 
     def __getitem__(self, idx):
         return self.examples[idx], self.labels[idx]

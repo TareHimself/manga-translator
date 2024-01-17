@@ -5,16 +5,14 @@ import sys
 from ultralytics import YOLO
 from translator.utils import (
     display_image,
-    get_outline_color,
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
     TranslatorGlobals,
-    run_in_thread_decorator,
-    transform_sample,
     has_white,
     get_model_path,
     apply_mask
 )
+from translator.color_detect.utils import apply_transforms
 import traceback
 import threading
 import torch
@@ -312,7 +310,7 @@ class FullConversion:
             # print("intersection found")
 
             # third pass, draw text
-            draw_colors = [(TranslatorGlobals.COLOR_BLACK,TranslatorGlobals.COLOR_BLACK) for x in to_translate]
+            draw_colors = [(TranslatorGlobals.COLOR_BLACK,TranslatorGlobals.COLOR_BLACK,False) for x in to_translate]
 
             start = time.time()
             if self.color_detect_model is not None and len(draw_colors) > 0:
@@ -330,17 +328,14 @@ class FullConversion:
                                 # return cv2.dilate(img,kernel,iterations = 1)
                                 return img
 
-                            images = [
-                                fix_image(frame_with_text.copy())
-                                for _, frame_with_text in to_translate
-                            ]
+                            images = [apply_transforms(frame_with_text.copy()) for _, frame_with_text in to_translate]
                             # images = [x[2].copy() for x in to_translate]
                             # [display_image(x,"To Detect") for x in images]
 
-                            draw_colors = [(y[:3],y[3:]) for y in [
-                                (x.cpu().numpy() * 255).astype(np.uint8)
+                            draw_colors = [(y[:3].astype(np.uint8) * 255,y[3:-1].astype(np.uint8) * 255,True if y[-1] > 0.5 else False) for y in [
+                                x.cpu().numpy()
                                 for x in self.color_detect_model(
-                                    torch.stack([transform_sample(y) for y in images]).to(
+                                    torch.stack(images).to(
                                         torch.device("cuda:0")
                                     )
                                 )
@@ -354,7 +349,7 @@ class FullConversion:
 
             to_draw = []
 
-
+            print(draw_colors)
             if self.translator and self.ocr and len(to_translate) > 0:
                 bboxes,images = zip(*to_translate)
 

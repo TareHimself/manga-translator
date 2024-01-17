@@ -124,7 +124,7 @@ class Translator(BasePlugin):
         return "Base Translator"
 
 class Drawable:
-    def __init__(self,color: tuple[np.ndarray,np.ndarray], translation: TranslatorResult,frame: np.ndarray) -> None:
+    def __init__(self,color: tuple[np.ndarray,np.ndarray,bool], translation: TranslatorResult,frame: np.ndarray) -> None:
         self.color = color
         self.translation = translation
         self.frame = frame
