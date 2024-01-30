@@ -195,5 +195,6 @@ def generate_color_detection_train_example(
     bg_color = (np.array(outline_color,dtype=np.uint8) if has_outline else np.array([0,0,0]))
     # print("COLORS",draw_text_color,bg_color)
     # display_image(frame_drawn, "Test Frame")
-    
-    return frame_drawn, np.concatenate([draw_text_color,bg_color,np.array([1 if has_outline else 0])])
+    # Result is frame_drawn and text_color + has_outline 
+    return frame_drawn, np.array(draw_text_color)
+#np.concatenate([draw_text_color,bg_color,np.array([1 if has_outline else 0])])

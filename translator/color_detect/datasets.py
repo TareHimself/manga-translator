@@ -108,7 +108,8 @@ class ColorDetectionDataset(Dataset):
                 
                 self.examples.append(example)
                 label = example_color.astype(np.float32)
-                label[:-1] = label[:-1] / 255
+                # label[:-1] = label[:-1] / 255
+                label = label / 255
                 self.labels.append(label)
                 loader.update()
                 num_generated += 1

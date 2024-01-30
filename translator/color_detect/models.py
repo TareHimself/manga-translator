@@ -96,25 +96,25 @@ class ColorDetectionModel(nn.Module):
         #     dropout = 0.3,
         #     emb_dropout = 0.1
         # ),
-        self.ex = ResnetFeatureExtractor(2048)
+        self.ex = ResnetFeatureExtractor(1024)
         self.fc = nn.Sequential(
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(2048, 2048),
+            nn.Linear(1024, 1024),
             nn.ReLU(),
-            nn.Linear(2048, 1024),
+            nn.Linear(1024, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(1024, 256),
+            nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(256, 7),
+            nn.Linear(256, 3),
             ClampModule(min=0,max=1))
 
     def forward(self,x):
         if self.training:
             x = train_augmenter(x)
-        to_display = apply_transforms_inverse(x[0] * 255)
-        display_image(to_display,"Train Augmentation Debug")
+        # to_display = apply_transforms_inverse(x[0] * 255)
+        # display_image(to_display,"Train Augmentation Debug")
         x = self.ex(x)
         x = self.fc(x)
         return x

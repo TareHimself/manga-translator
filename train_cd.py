@@ -54,7 +54,8 @@ with torch.no_grad():
                 to_eval = example.copy()
                 to_eval = apply_transforms(to_eval).unsqueeze(0).type(torch.FloatTensor).to(pytorch_device)
                 results = model(to_eval)[0].cpu().numpy()
-                results[:-1] = results[:-1] * 255
+                # results[:-1] = results[:-1] * 255
+                results = results * 255
                 color = np.array(results, dtype=np.int32)
                 print("Detected color", color)
                 print("Actual color", example_color)

@@ -13,7 +13,7 @@ def train_model(
     backgrounds=[],
     epochs=1000,
     batch_size=32,
-    learning_rate=0.0001,
+    learning_rate=0.0005,
     weights_path=None,
     seed=200,
     patience = 50,

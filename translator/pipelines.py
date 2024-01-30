@@ -332,7 +332,7 @@ class FullConversion:
                             # images = [x[2].copy() for x in to_translate]
                             # [display_image(x,"To Detect") for x in images]
 
-                            draw_colors = [(y[:3].astype(np.uint8) * 255,y[3:-1].astype(np.uint8) * 255,True if y[-1] > 0.5 else False) for y in [
+                            draw_colors = [y.astype(np.uint8) * 255 for y in [
                                 x.cpu().numpy()
                                 for x in self.color_detect_model(
                                     torch.stack(images).to(
