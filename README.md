@@ -20,7 +20,7 @@
 
 ## Progress
 
-- [x] Bubble inpainting using [deepfillv2](https://arxiv.org/abs/1806.03589) credit to [nipponjo](https://github.com/nipponjo) and his [implementation](https://github.com/TareHimself/deepfillv2-pytorch)
+- [x] Bubble inpainting using [deepfillv2](https://github.com/nipponjo/deepfillv2-pytorch)
 - [x] Bubble recognition (should improve with more training data)
 - [x] Free text recognition (should improve with more training data)
 - [x] Bubble text extraction
@@ -31,11 +31,11 @@
 - [x] Bubble Text hypenation
 - [x] Format and structure dataset
 - [x] Create converters i.e. yolo => coco, my dataset => yolo etc
+- [ ] Detection of text color
 - [ ] Better free text ocr
 - [ ] Better free text translation
-- [ ] Add more inpainting options i.e sd
 - [ ] Improve text resize algorithm, some texts are too small/big
-- [ ] Implement "https://github.com/advimman/lama" for cleaning
+- [x] Implement [lama](https://github.com/advimman/lama) for cleaning
 
 ## Models
 
@@ -46,17 +46,13 @@
 - setup [Anaconda](https://www.anaconda.com/download)
 - clone this repository
 - Open a terimal in the cloned repository
-- Run the following in the terminal to create an enviroment
+- Run the following
 
 ```py
 conda create -n manga-translator python=3.10
 conda activate manga-translator
-```
+conda install -c conda-forge poetry
 
-- Install [Poetry](https://python-poetry.org/)
-- Run the following in the enviroment we created
-
-```bash
 poetry install
 # For cuda support run "poe force-cuda"
 ```
@@ -75,7 +71,7 @@ poe run-server
 ### CLI
 
 ```bash
-python main.py -m -f image1.png image2.png
+python main.py -f image1.png image2.png
 ```
 
 ## Datasets

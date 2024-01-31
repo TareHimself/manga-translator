@@ -32,7 +32,7 @@ class LamaCleaner(Cleaner):
         mask: ndarray,
         detection_results: list[tuple[tuple[int, int, int, int], str, float]] = ...,
     ) -> tuple[ndarray, ndarray]:
-        return await in_paint_optimized(
+        return in_paint_optimized(
             frame=frame,
             mask=mask,
             filtered=detection_results,

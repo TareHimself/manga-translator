@@ -17,9 +17,9 @@ def train_model(
     weights_path=None,
     seed=200,
     patience = 50,
-    use_fp16 = True,
+    use_fp16 = False,
     device=torch.device("cuda:0"),
-):
+) -> torch.nn.Module:
     dataset = ColorDetectionDataset(
         generate_target=num_samples,
         backgrounds=backgrounds,
@@ -30,7 +30,7 @@ def train_model(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model = get_color_detection_model(weights_path=weights_path, device=device)
-
+    model.train()
     criterion = nn.MSELoss()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
