@@ -58,8 +58,7 @@ poetry install
 ```
 
 - Download models to models/modelname (i.e. models/detection.pt)
-- If you plan to use the UI also install [NodeJS](https://nodejs.org/en)
-
+  
 ## Run
 
 ### UI
