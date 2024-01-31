@@ -16,8 +16,8 @@ backgrounds = [cv2.imread(f"./assets/backgrounds/{x}") for x in
                os.listdir("./assets/backgrounds")]  # some background noise for the dataset
 
 
-model = train_model(epochs=30000, seed=42, device=pytorch_device, num_samples=30000,
-                    num_workers=1,batch_size=32,backgrounds=backgrounds,patience=100)#, weights_path="models/color_detection.pt")  # trains then returns the trained model
+model = train_model(epochs=30000, seed=20, device=pytorch_device, num_samples=50000,#30000,
+                    num_workers=1,batch_size=64,backgrounds=backgrounds,patience=100)#, weights_path="models/color_detection.pt")  # trains then returns the trained model
 
 model = model.to(torch.device('cpu'))
 
@@ -54,10 +54,10 @@ with torch.no_grad():
                 to_eval = example.copy()
                 to_eval = apply_transforms(to_eval).unsqueeze(0).type(torch.FloatTensor).to(pytorch_device)
                 results = model(to_eval)[0].cpu().numpy()
-                # results[:-1] = results[:-1] * 255
-                results = results * 255
-                color = np.array(results, dtype=np.int32)
-                print("Detected color", color)
+                results[:-1] = results[:-1] * 255
+                #results = results * 255
+                #color = np.array(results, dtype=np.int32)
+                print("Detected color", results[:-1].astype(np.uint8),results[-1])
                 print("Actual color", example_color)
                 display_image(example, "Test Frame")
             except KeyboardInterrupt:

@@ -58,7 +58,7 @@ class ResnetFeatureExtractor(nn.Module):
         super().__init__()
         self.ex = get_timm_model(lambda x : nn.Linear(x, out_features),
             channels=3,
-            model_name="resnet18")
+            model_name="resnet34")
 
     def forward(self,x):
         return self.ex(x)
@@ -84,30 +84,18 @@ class ViTFeatureExtractor(nn.Module):
 class ColorDetectionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        # self.vit = nn.Sequential(
-        #     ViT(
-        #     image_size = image_size,
-        #     patch_size = 16,
-        #     num_classes = 1024,
-        #     dim = 1024,
-        #     depth = 6,
-        #     heads = 16,
-        #     mlp_dim = 2048,
-        #     dropout = 0.3,
-        #     emb_dropout = 0.1
-        # ),
-        self.ex = ResnetFeatureExtractor(1024)
+        self.ex = ResnetFeatureExtractor(2048)
         self.fc = nn.Sequential(
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(1024, 1024),
+            nn.Linear(2048, 1024),
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(256, 3),
+            nn.Linear(256, 7),
             ClampModule(min=0,max=1))
 
     def forward(self,x):

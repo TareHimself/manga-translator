@@ -148,7 +148,6 @@ def get_outline_color(
 
 #     return apply_transforms(image)
 
-
 def generate_color_detection_train_example(
     text: str = "Sample",
     background: np.ndarray = np.full((500,500, 3), 255, dtype=np.uint8),
@@ -168,14 +167,8 @@ def generate_color_detection_train_example(
     if draw_surface is None:  # background was too small
         draw_surface = np.full((*size[::-1], 3), 255, dtype=np.uint8)
 
-    draw_text_color = generator.choice(
-        [
-            np.array(rand_color(generator),dtype=np.uint8),
-            np.array((0, 0, 0),dtype=np.uint8),
-            np.array((255, 255, 255),dtype=np.uint8),
-        ]
-    )  # random color, white or black
-
+    draw_text_color = np.array(rand_color(generator),dtype=np.uint8)  # random color
+    
     outline_color = get_outline_color(draw_surface, draw_text_color)
 
     frame_drawn = draw_text_in_bubble(
@@ -196,5 +189,5 @@ def generate_color_detection_train_example(
     # print("COLORS",draw_text_color,bg_color)
     # display_image(frame_drawn, "Test Frame")
     # Result is frame_drawn and text_color + has_outline 
-    return frame_drawn, np.array(draw_text_color)
+    return frame_drawn, np.concatenate([draw_text_color,bg_color,np.array([1 if has_outline else 0])]) # np.array(draw_text_color), 
 #np.concatenate([draw_text_color,bg_color,np.array([1 if has_outline else 0])])

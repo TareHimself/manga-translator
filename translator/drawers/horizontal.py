@@ -85,17 +85,21 @@ class HorizontalDrawer(Drawer):
         image_draw = ImageDraw.Draw(frame_as_pil)
 
         mask_draw = ImageDraw.Draw(mask_as_pil)
-        color_fg = item.color
-        avg_frame_color = np.mean(item.frame, axis=(0, 1))
-        frame_to_text_sim = luminance_similarity(color_fg,avg_frame_color)
-        color_bg =  np.array([255,255,255]).astype(np.uint8)
-        stroke_width = 0
-        if frame_to_text_sim > 0.5:
-            stroke_width = 2
-            sim_to_white = luminance_similarity(color_fg,TranslatorGlobals.COLOR_WHITE)
-            sim_to_black = luminance_similarity(color_fg,TranslatorGlobals.COLOR_BLACK)
-            if sim_to_black < sim_to_white:
-                color_bg = np.array([0,0,0]).astype(np.uint8)
+        # color_fg = item.color
+        # avg_frame_color = np.mean(item.frame, axis=(0, 1))
+        # frame_to_text_sim = luminance_similarity(color_fg,avg_frame_color)
+        # color_bg = np.array([255,255,255]).astype(np.uint8)
+
+        # if frame_to_text_sim > 0.5:
+        #     stroke_width = 2
+        #     sim_to_white = luminance_similarity(color_fg,TranslatorGlobals.COLOR_WHITE)
+        #     sim_to_black = luminance_similarity(color_fg,TranslatorGlobals.COLOR_BLACK)
+        #     if sim_to_black < sim_to_white:
+        #         color_bg = np.array([0,0,0]).astype(np.uint8)
+
+        color_fg,color_bg,should_do_bg = item.color
+        
+        stroke_width = 2 if should_do_bg else 0
 
         # print("SIMILARITY",luminance_similarity(item.color[0],item.color[1]),item.color)
         # print("DRAWING",item.translation.text)
