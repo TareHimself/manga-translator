@@ -149,10 +149,10 @@ class FullConversion:
 
         return frame, frame_clean, text_mask, detect_result
 
-    async def process_frame(self, detect_result, seg_result, frame):
+    async def process_frame(self, detect_result, seg_result, input_frame):
         try:
             frame, frame_clean, text_mask, detect_result = await self.process_ml_results(
-                detect_result, seg_result, frame
+                detect_result, seg_result, input_frame
             )
 
             to_translate = []
@@ -336,7 +336,7 @@ class FullConversion:
                                 x.cpu().numpy()
                                 for x in self.color_detect_model(
                                     torch.stack(images).to(
-                                        torch.device("cuda:0")
+                                        self.device
                                     )
                                 )
                             ]]
@@ -397,7 +397,7 @@ class FullConversion:
             return frame
         except:
             traceback.print_exc()
-            return None
+            return input_frame
 
     async def __call__(
         self,

@@ -5,13 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Translation",
-            "type": "python",
+            "name": "Debug Main",
+            "type": "debugpy",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["-f","trans-test"]
+            "args": ["-f","${input:folder}"]
+        },
+        {
+            "name": "Debug Server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "server.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "folder",
+            "description": "What folder would you like to translate ?",
+            "default": "${workspaceFolder}/trans-test",
+            "type": "promptString",
         }
     ]
 }
