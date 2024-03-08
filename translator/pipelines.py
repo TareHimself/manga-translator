@@ -417,7 +417,7 @@ class FullConversion:
 
         print(f"Yolov8 Models => {time.time() - start} seconds")
 
-        tasks = [self.process_frame(detect_result=detect_result,seg_result=seg_result,frame=frame) for detect_result, seg_result, frame in to_process]
+        tasks = [self.process_frame(detect_result=detect_result,seg_result=seg_result,input_frame=frame) for detect_result, seg_result, frame in to_process]
         results = await asyncio.gather(*tasks)
 
         print(f"Total Process => {time.time() - total_start} seconds")
