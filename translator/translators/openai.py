@@ -1,4 +1,5 @@
 import asyncio
+import os
 from translator.utils import get_languages
 from translator.core.plugin import (
     Translator,
@@ -20,33 +21,44 @@ class OpenAiTranslator(Translator):
         ("GPT 4 0613", "gpt-4-0613"),
         ("GPT 3.5 Turbo 16K", "gpt-3.5-turbo-16k"),
         ("GPT 3.5 Turbo 0613", "gpt-3.5-turbo-0613"),
+        ("GPT 3.5 Turbo 0125", "gpt-3.5-turbo-0125")
     ]
 
     def __init__(
-        self, api_key="", target_lang="en", model=MODELS[0][1], temp="0.2"
+        self, api_key="", target_lang="en", model=MODELS[5][1], temp="0.2"
     ) -> None:
         super().__init__()
         import openai
+        
+        api_key = os.getenv("OPENAI_API_KEY")
 
+        if not api_key:
+            raise ValueError("Missing OpenAI API key")
+        
         openai.api_key = api_key
         self.openai = openai
         self.target_lang = target_lang
         self.model = model
         self.temp = float(temp)
 
-    async def translate_one(self,ocr_result: OcrResult):
+    async def translate_one(self, ocr_result: OcrResult):
         message = f"{ocr_result.language.upper()} to {self.target_lang.upper()}\n{ocr_result.text}"
 
-        result = self.openai.ChatCompletion.create(
+        result = self.openai.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "user", "content": "EN to JA\nHello"},
-                {"role": "assistant", "content": "こんにちは"},
-                {"role": "user", "content": message},
-            ],
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant."
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
         )
         return TranslatorResult(
-            result["choices"][0].message["content"].strip(), self.target_lang
+            result.choices[0].message.content.strip(), self.target_lang
         )
     
     async def translate(self, batch: list[OcrResult]):

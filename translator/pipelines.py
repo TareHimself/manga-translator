@@ -76,7 +76,8 @@ class FullConversion:
                 self.color_detect_model = None
         except:
             self.color_detect_model = None
-            traceback.print_exc()
+            print("Color detection model not found. Skipping...")
+            # traceback.print_exc() the traceback is actually kinda annoying
 
         self.translate_free_text = translate_free_text
         self.translator = translator
@@ -332,12 +333,12 @@ class FullConversion:
                             # images = [x[2].copy() for x in to_translate]
                             # [display_image(x,"To Detect") for x in images]
 
+                            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
                             draw_colors = [((y[0:3] * 255).astype(np.uint8),(y[3:-1] * 255).astype(np.uint8),(True if y[-1] > 0.5 else False)) for y in [
                                 x.cpu().numpy()
                                 for x in self.color_detect_model(
-                                    torch.stack(images).to(
-                                        torch.device("cuda:0")
-                                    )
+                                    torch.stack(images).to(device)
                                 )
                             ]]
             else:
