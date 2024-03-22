@@ -47,15 +47,10 @@ class OpenAiTranslator(Translator):
         result = self.openai.chat.completions.create(
             model=self.model,
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": message
-                }
-            ]
+                {"role": "user", "content": "EN to JA\nHello"},
+                {"role": "assistant", "content": "こんにちは"},
+                {"role": "user", "content": message},
+            ],
         )
         return TranslatorResult(
             result.choices[0].message.content.strip(), self.target_lang
