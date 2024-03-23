@@ -1,0 +1,30 @@
+# Activate the conda environment.
+conda activate manga-translator
+
+# Display the help message.
+python main.py -h
+
+# Run the app with different configurations. These are the 3 configs that I find most useful.
+
+    # CLI:
+        # Put the images you want to translate in the img/translate folder.
+
+        # Configuration 1: Use Japanese OCR and Hugging Face translation.
+            # The -o 1 option selects Japanese OCR.
+            # The -t 1 option selects Hugging Face translation.
+            # The -f ./img/translate option specifies the images to translate.
+            python main.py -o 1 -t 1 -f ./img/translate 
+
+        # Configuration 2: Use Japanese OCR and OpenAI translation.
+            # Before running this configuration, you need to set the OPENAI_API_KEY environment variable.
+            # Replace <yourkey> with your actual OpenAI API key.
+            setx OPENAI_API_KEY "<yourkey>"
+            # The -o 1 option selects Japanese OCR.
+            # The -t 4 option selects OpenAI translation.
+            # The -f ./img/translate option specifies the images to translate.
+            python main.py -o 1 -t 4 -f ./img/translate
+            # For more information about API key safety, visit https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety
+
+    # UI:
+        # This starts the manga-translator server for UI interaction.
+        poe run-server
