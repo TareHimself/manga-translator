@@ -59,7 +59,7 @@ poetry install
 
 - Download models to models/modelname (i.e. models/detection.pt)
   
-## Run
+## Usage
 
 ### UI
 
