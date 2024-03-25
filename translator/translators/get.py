@@ -4,6 +4,7 @@ from translator.translators.google import GoogleTranslateTranslator
 from translator.translators.hugging_face import HuggingFace
 from translator.translators.debug import DebugTranslator
 from translator.translators.openai import OpenAiTranslator
+from translator.translators.gemini import GeminiTranslator
 
 
 def get_translators() -> list[Translator]:
@@ -16,6 +17,7 @@ def get_translators() -> list[Translator]:
                 DeepLTranslator,
                 GoogleTranslateTranslator,
                 OpenAiTranslator,
+                GeminiTranslator
             ],
         )
     )

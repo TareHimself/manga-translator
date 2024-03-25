@@ -149,10 +149,10 @@ class FullConversion:
 
         return frame, frame_clean, text_mask, detect_result
 
-    async def process_frame(self, detect_result, seg_result, frame):
+    async def process_frame(self, detect_result, seg_result, input_frame):
         try:
             frame, frame_clean, text_mask, detect_result = await self.process_ml_results(
-                detect_result, seg_result, frame
+                detect_result, seg_result, input_frame
             )
 
             to_translate = []
@@ -318,25 +318,13 @@ class FullConversion:
                     with torch.inference_mode():
                         with self.frame_process_mutex:  # this may not be needed
 
-                            def fix_image(img):
-                                # img = adjust_contrast_brightness(frame,contrast=2)
-                                # size_dil = 3
-                                # returncv2.GaussianBlur(img, (size_dil, size_dil), 0)
-
-                                # final_mask_dilation = 6
-                                # kernel = np.ones((final_mask_dilation,final_mask_dilation),np.uint8)
-                                # return cv2.dilate(img,kernel,iterations = 1)
-                                return img
-
                             images = [apply_transforms(frame_with_text.copy()) for _, frame_with_text in to_translate]
-                            # images = [x[2].copy() for x in to_translate]
-                            # [display_image(x,"To Detect") for x in images]
 
                             draw_colors = [((y[0:3] * 255).astype(np.uint8),(y[3:-1] * 255).astype(np.uint8),(True if y[-1] > 0.5 else False)) for y in [
                                 x.cpu().numpy()
                                 for x in self.color_detect_model(
                                     torch.stack(images).to(
-                                        torch.device("cuda:0")
+                                        self.device
                                     )
                                 )
                             ]]
@@ -349,7 +337,6 @@ class FullConversion:
 
             to_draw = []
 
-            print(draw_colors)
             if self.translator and self.ocr and len(to_translate) > 0:
                 bboxes,images = zip(*to_translate)
 
@@ -376,19 +363,7 @@ class FullConversion:
 
                 for bbox, drawn_frame in zip(bboxes,drawn_frames):
                     (x1, y1, x2, y2) = bbox
-
-                    # draw_frame = frame[y1:y2, x1:x2]
-
-                    # outline_color = get_outline_color(draw_frame, draw_color)
-
                     drawn_frame,drawn_frame_mask = drawn_frame
-                    #print("SHAPE",drawn_frame_mask.shape)
-                    #frame[y1:y2, x1:x2] = drawn_frame#apply_mask(frame[y1:y2, x1:x2],drawn_frame,drawn_frame_mask)
-                    # display_image(drawn_frame_mask,"Mask")
-                    # display_image(drawn_frame,"Text")
-                    # display_image(cv2.bitwise_not(drawn_frame_mask),"BITWISE")
-                    # display_image(cv2.bitwise_and(drawn_frame, drawn_frame, mask=drawn_frame_mask),"Masked1")
-                    # display_image(cv2.bitwise_and(frame[y1:y2, x1:x2], frame[y1:y2, x1:x2], mask=cv2.bitwise_not(drawn_frame_mask)),"Masked2")
                     frame[y1:y2, x1:x2] = apply_mask(drawn_frame,frame[y1:y2, x1:x2],drawn_frame_mask)
 
                     
@@ -397,7 +372,7 @@ class FullConversion:
             return frame
         except:
             traceback.print_exc()
-            return None
+            return input_frame
 
     async def __call__(
         self,
@@ -417,7 +392,7 @@ class FullConversion:
 
         print(f"Yolov8 Models => {time.time() - start} seconds")
 
-        tasks = [self.process_frame(detect_result=detect_result,seg_result=seg_result,frame=frame) for detect_result, seg_result, frame in to_process]
+        tasks = [self.process_frame(detect_result=detect_result,seg_result=seg_result,input_frame=frame) for detect_result, seg_result, frame in to_process]
         results = await asyncio.gather(*tasks)
 
         print(f"Total Process => {time.time() - total_start} seconds")
