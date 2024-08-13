@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from PIL import ImageFont, ImageDraw
 from numpy import ndarray
-from hyphen import Hyphenator
+import pyphen
 import asyncio
 from translator.core.plugin import (
     Drawable,
@@ -55,7 +55,7 @@ class HorizontalDrawer(Drawer):
         # cv2.rectangle(frame, pt1, pt2, (255, 255, 255), -1)
         # cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 1)
 
-        hyphenator = Hyphenator("en_US")
+        hyphenator = pyphen.Pyphen(lang="en")
 
         font_size, chars_per_line, line_height, iters = get_best_font_size(
             item.translation.text,

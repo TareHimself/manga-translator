@@ -17,11 +17,10 @@ import largestinteriorrectangle as lir
 from torchvision import transforms
 from typing import Union, Callable
 from PIL import Image, ImageDraw, ImageFont
-from hyphen import Hyphenator
+import pyphen
 from tqdm import tqdm
 from collections import deque
 import traceback
-
 
 class TranslatorGlobals:
     COLOR_BLACK = np.array((0, 0, 0))
@@ -595,7 +594,7 @@ def try_merge_hyphenated(text: list[str], max_chars: int):
     return final
 
 
-def wrap_text(text: str, max_chars: int, hyphenator: Union[Hyphenator, None]):
+def wrap_text(text: str, max_chars: int, hyphenator: Union[pyphen.Pyphen, None]):
     total = deque(list(filter(lambda a: len(a.strip()) > 0, text.split(" "))))
     current_word = total.popleft()
     lines = []
@@ -613,7 +612,7 @@ def wrap_text(text: str, max_chars: int, hyphenator: Union[Hyphenator, None]):
                     current_word = current_word[:idx]
                     continue
                 elif hyphenator is not None:
-                    pairs = hyphenator.pairs(current_word)
+                    pairs = list(hyphenator.iterate(current_word))
                 else:
                     pairs = []
             except:
@@ -678,7 +677,7 @@ def get_best_font_size(
     step: int = 1,
     min_chars_per_line: int = 6,
     initial_iterations: int = 0,
-    hyphenator: Union[Hyphenator, None] = None,
+    hyphenator: Union[pyphen.Pyphen, None] = None,
 ) -> Union[tuple[None, None, None, int], tuple[int, int, int, int]]:
     current_font_size = start_size
     current_font = None
@@ -728,7 +727,7 @@ def draw_text_in_bubble(
     color=(0, 0, 0),
     outline=1,
     outline_color: Union[tuple[int, int, int], None] = (255, 255, 255),
-    hyphenator: Union[Hyphenator, None] = Hyphenator("en_US"),
+    hyphenator: Union[pyphen.Pyphen, None] = pyphen.Pyphen(lang="en"),
     offset: tuple[int, int] = (0, 0),
     rotation: int = 0,
 ):
