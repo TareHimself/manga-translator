@@ -9,7 +9,6 @@ import torch
 import threading
 import pycountry
 import numpy as np
-import PIL
 import PySimpleGUI as sg
 import asyncio
 import inspect
@@ -1240,3 +1239,16 @@ def overlap_percent(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]) 
 
 def is_cuda_available():
     return torch.cuda.is_available() and torch.cuda.device_count() > 0
+
+def format_color_detect_output(result: tuple[torch.Tensor,torch.Tensor,torch.Tensor]) -> list[tuple[np.ndarray,np.ndarray,bool]]:
+    stacked = torch.cat(result,dim = 1)
+
+    all_results = []
+    
+    for stack in stacked:
+        fg = (stack[:3].cpu().numpy() * 255).astype(np.uint8)
+        outline = (stack[3:6].cpu().numpy() * 255).astype(np.uint8)
+        has_outline = stack[6].cpu().numpy() > 0.5
+        all_results.append((fg,outline,has_outline))
+    
+    return all_results

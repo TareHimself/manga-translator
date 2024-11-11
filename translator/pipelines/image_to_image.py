@@ -5,6 +5,7 @@ from translator.pipelines.pipeline import Pipeline
 from ultralytics import YOLO
 from translator.utils import (
     display_image,
+    format_color_detect_output,
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
     TranslatorGlobals,
@@ -328,14 +329,12 @@ class DefaultImageToImagePipeline(ImageToImagePipeline):
 
                             images = [apply_transforms(frame_with_text.copy()) for _, frame_with_text in to_translate]
 
-                            draw_colors = [((y[0:3] * 255).astype(np.uint8),(y[3:-1] * 255).astype(np.uint8),(True if y[-1] > 0.5 else False)) for y in [
-                                x.cpu().numpy()
-                                for x in self.color_detect_model(
+                            draw_colors = [x for x in format_color_detect_output(self.color_detect_model(
                                     torch.stack(images).to(
                                         self.device
                                     )
-                                )
-                            ]]
+                                ))
+                            ]
             else:
                 print("Using black since color detect model is 'None'")
 

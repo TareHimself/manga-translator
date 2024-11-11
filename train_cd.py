@@ -3,7 +3,7 @@ import torch
 from translator.color_detect.constants import IMAGE_SIZE
 from translator.color_detect.models import get_color_detection_model
 from translator.color_detect.utils import generate_color_detection_train_example, apply_transforms
-from translator.utils import display_image
+from translator.utils import display_image, format_color_detect_output
 import cv2
 import os
 from faker import Faker
@@ -16,7 +16,7 @@ backgrounds = [cv2.imread(f"./assets/backgrounds/{x}") for x in
                os.listdir("./assets/backgrounds")]  # some background noise for the dataset
 
 
-model = train_model(epochs=30000, seed=20, device=pytorch_device, num_samples=50000,#30000,
+model = train_model(epochs=30000, seed=20, device=pytorch_device, num_samples=5,#30000,
                     num_workers=1,batch_size=64,backgrounds=backgrounds,patience=100)#, weights_path="models/color_detection.pt")  # trains then returns the trained model
 
 model = model.to(torch.device('cpu'))
@@ -53,11 +53,14 @@ with torch.no_grad():
                                                                         generator=gen, font_file="fonts/NotoSansJP-Regular.ttf",background=bg_random)
                 to_eval = example.copy()
                 to_eval = apply_transforms(to_eval).unsqueeze(0).type(torch.FloatTensor).to(pytorch_device)
-                results = model(to_eval)[0].cpu().numpy()
-                results[:-1] = results[:-1] * 255
+                fg,outline,has_outline = model(to_eval)
+                format_color_detect_output([fg,outline,has_outline])
+                fg = (fg[0].cpu().numpy() * 255).astype(np.uint8)
+                outline = (outline[0].cpu().numpy() * 255).astype(np.uint8)
+                has_outline = has_outline[0].cpu().numpy() > 0.5
                 #results = results * 255
                 #color = np.array(results, dtype=np.int32)
-                print("Detected color", results[:-1].astype(np.uint8),results[-1])
+                print("Detected color",fg,outline,has_outline)
                 print("Actual color", example_color)
                 display_image(example, "Test Frame")
             except KeyboardInterrupt:

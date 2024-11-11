@@ -11,7 +11,7 @@ import numpy as np
 import asyncio
 from tornado.web import RequestHandler, Application
 from translator.utils import cv2_to_pil, pil_to_cv2, run_in_thread_decorator
-from translator.pipelines import FullConversion
+from translator.pipelines.image_to_image import DefaultImageToImagePipeline
 from translator.translators.get import get_translators
 from translator.translators.deepl import DeepLTranslator
 from translator.ocr.get import get_ocr
@@ -89,7 +89,7 @@ class CleanFromWebHandler(RequestHandler):
                 "cleanerArgs", {}
             )
             image_cv2 = pil_to_cv2(Image.open(io.BytesIO(image[0]["body"])))
-            converter = FullConversion(
+            converter = DefaultImageToImagePipeline(
                 ocr=NoOcr(), cleaner=get_cleaners()[cleaner_id](**cleaner_params)
             )
             results = await converter([image_cv2])
@@ -138,7 +138,7 @@ class TranslateFromWebHandler(RequestHandler):
 
             image_cv2 = pil_to_cv2(Image.open(io.BytesIO(image[0]["body"])))
 
-            converter = FullConversion(
+            converter = DefaultImageToImagePipeline(
                 translator=get_translators()[translator_id](**translator_params),
                 ocr=get_ocr()[ocr_id](**ocr_params),
                 drawer=get_drawers()[drawer_id](**drawer_params),
@@ -256,7 +256,7 @@ class BaseHandler(RequestHandler):
 
 
 class MiraTranslateWebHandler(RequestHandler):
-    converter: Union[FullConversion, None] = None
+    converter: Union[DefaultImageToImagePipeline, None] = None
 
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
@@ -276,7 +276,7 @@ class MiraTranslateWebHandler(RequestHandler):
                 raise BaseException("No Image Sent")
 
             if MiraTranslateWebHandler.converter is None:
-                MiraTranslateWebHandler.converter = FullConversion(
+                MiraTranslateWebHandler.converter = DefaultImageToImagePipeline(
                     color_detect_model=None,
                     # translator=OpenAiTranslator(api_key=os.getenv("GPT_AUTH")),
                     translator=DeepLTranslator(auth_token=os.getenv("DEEPL_AUTH")),

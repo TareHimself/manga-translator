@@ -6,8 +6,8 @@ from torch.utils.data import Dataset
 import math
 import numpy as np
 import os
-from .constants import IMAGE_SIZE
-from .utils import generate_color_detection_train_example, apply_transforms
+from constants import IMAGE_SIZE
+from utils import generate_color_detection_train_example, apply_transforms
 
 
 class ColorDetectionDataset(Dataset):

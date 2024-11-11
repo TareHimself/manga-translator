@@ -32,3 +32,4 @@ exa/*
 local/*
 trans-test/*
 *.env
+training/detection/datasets/

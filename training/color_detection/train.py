@@ -3,8 +3,8 @@ import torch.nn as nn
 import copy
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from .datasets import ColorDetectionDataset
-from .models import get_color_detection_model
+from dataset import ColorDetectionDataset
+from model import get_color_detection_model
 
 
 def train_model(

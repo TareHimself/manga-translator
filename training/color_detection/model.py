@@ -5,7 +5,7 @@ import torch.functional as F
 import torch.nn as nn
 from torchvision import transforms
 from vit_pytorch import ViT
-from .constants import IMAGE_SIZE
+from constants import IMAGE_SIZE
 train_augmenter = transforms.Compose(
     [
         # transforms.RandomAdjustSharpness(sharpness_factor=2),
@@ -111,8 +111,10 @@ class ColorDetectionModel(nn.Module):
             )
 
     def forward(self,x):
-        if self.training:
-            x = train_augmenter(x)
+        # if self.training:
+        #     x = train_augmenter(x)
+        # to_display = apply_transforms_inverse(x[0] * 255)
+        # display_image(to_display,"Train Augmentation Debug")
         features = self.ex(x)
 
         return self.text_color(features), self.border_color(features), self.has_boarder(features)
