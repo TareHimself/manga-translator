@@ -4,8 +4,8 @@ import torch
 import cv2
 import numpy as np
 from torchvision import transforms
-from draw_text import draw_text_in_bubble
-from constants import IMAGE_SIZE
+from translator.utils import draw_text_in_bubble
+from .constants import IMAGE_SIZE
 
 
 class PadTensorToSquare:
@@ -37,8 +37,8 @@ apply_transforms = transforms.Compose(
     [
         CvToTensor(),
         PadTensorToSquare(),
-        transforms.Resize((IMAGE_SIZE,IMAGE_SIZE),antialias=False),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        transforms.Resize((IMAGE_SIZE,IMAGE_SIZE),antialias=False,),
+        transforms.Normalize([0,0,0], [255,255,255]),
     ]
 )
 
@@ -66,11 +66,29 @@ def random_section_from_image(
 
 
 def rand_color(generator=random.Random()):
-    return (
-        generator.randint(0, 255),
-        generator.randint(0, 255),
-        generator.randint(0, 255),
-    )
+    # if generator.choice([True,False]):
+    #     return (0,0,0)
+    # else:
+    #     return (255,255,255)
+    # return (
+    #         generator.randint(0, 255),
+    #         generator.randint(0, 255),
+    #         generator.randint(0, 255),
+    #     )
+    idx = generator.randint(0,2)
+
+    if idx == 0:
+        return (0,0,0)
+    elif idx == 1:
+        return (255,255,255)
+    else:
+        return (
+            generator.randint(0, 255),
+            generator.randint(0, 255),
+            generator.randint(0, 255),
+        )
+
+    
 
 
 def get_average_color(surface: np.ndarray):
@@ -131,7 +149,7 @@ def generate_color_detection_train_example(
     size: tuple[int, int] = (200, 200),
     # shift_max: tuple[int, int] = (20, 20),
     # rotation_angles: list[int] = [0, 90, -90, 180],
-    outline_range: tuple[int,int] = (1,3),
+    outline_range: tuple[int,int] = (1,2),
     font_file="fonts/animeace2_reg.ttf",
     generator=random.Random(),
     force_outline = False
@@ -145,11 +163,15 @@ def generate_color_detection_train_example(
     if draw_surface is None:  # background was too small
         draw_surface = np.full((*size[::-1], 3), 255, dtype=np.uint8)
 
-    draw_text_color = np.array(rand_color(generator),dtype=np.uint8)  # random color
+    draw_text_color_tuple = rand_color(generator)
+    draw_text_color = np.array(draw_text_color_tuple,dtype=np.uint8)  # random color
     
-    #outline_color = get_outline_color(draw_surface, draw_text_color,force_outline=force_outline) if outline_color is None else outline_color
+    outline_color = get_outline_color(draw_surface, draw_text_color,force_outline=force_outline)
 
-    outline_color = rand_color(generator)
+    # outline_color = rand_color(generator) if force_outline else None
+    # #print(outline_color,draw_text_color)
+    # while outline_color is not None and outline_color == draw_text_color_tuple:
+    #     outline_color = rand_color(generator)
 
     frame_drawn = draw_text_in_bubble(
         draw_surface,
@@ -272,16 +294,135 @@ def denormalize_lab_np(norm_lab: np.ndarray) -> np.ndarray:
     b = norm_lab[:, 2] * 128.0
     return np.stack((L, a, b), axis=1)
 
-def format_color_detect_output(result: tuple[torch.Tensor,torch.Tensor]) -> list[tuple[np.ndarray,np.ndarray,bool]]:
+def rgb_to_hsv(rgb):
+    rgb = rgb.astype(np.float32) / 255.0  # Normalize to [0, 1]
+    r, g, b = rgb[:, 0], rgb[:, 1], rgb[:, 2]
+
+    maxc = np.maximum.reduce([r, g, b])
+    minc = np.minimum.reduce([r, g, b])
+    delta = maxc - minc
+
+    h = np.zeros_like(maxc)
+    s = np.zeros_like(maxc)
+    v = maxc
+
+    nonzero_delta = delta > 1e-6  # Mask for non-zero delta
+
+    # Hue calculation (only where delta > 0)
+    mask = nonzero_delta
+    r_eq_max = (maxc == r) & mask
+    g_eq_max = (maxc == g) & mask
+    b_eq_max = (maxc == b) & mask
+
+    h[r_eq_max] = ((g[r_eq_max] - b[r_eq_max]) / delta[r_eq_max]) % 6
+    h[g_eq_max] = ((b[g_eq_max] - r[g_eq_max]) / delta[g_eq_max]) + 2
+    h[b_eq_max] = ((r[b_eq_max] - g[b_eq_max]) / delta[b_eq_max]) + 4
+    h = (h / 6.0) % 1.0  # Normalize hue to [0, 1]
+
+    # Saturation calculation (where maxc > 0)
+    s[maxc > 0] = delta[maxc > 0] / maxc[maxc > 0]
+
+    return np.stack([h, s, v], axis=1)
+    # rgb = rgb.astype(np.float32) / 255.0  # Normalize RGB to [0, 1]
+    # r, g, b = rgb[:, 0], rgb[:, 1], rgb[:, 2]
+
+    # maxc = np.maximum(np.maximum(r, g), b)
+    # minc = np.minimum(np.minimum(r, g), b)
+    # delta = maxc - minc
+    # delta = np.maximum(delta,np.full_like(delta,0.00000001))
+    # h = np.zeros_like(maxc)
+    # s = np.zeros_like(maxc)
+    # v = maxc
+
+    # mask = delta != 0
+    # rc = (((g - b) / delta) % 6)[mask]
+    # gc = (((b - r) / delta) + 2)[mask]
+    # bc = (((r - g) / delta) + 4)[mask]
+
+    # h[mask & (maxc == r)] = rc
+    # h[mask & (maxc == g)] = gc
+    # h[mask & (maxc == b)] = bc
+    # h = (h / 6.0) % 1.0  # Normalize hue to [0, 1]
+
+    # s[mask] = delta[mask] / np.maximum(maxc[mask],np.full_like(maxc[mask],0.00000001))
+
+    # return np.stack([h, s, v], axis=1)
+
+def hsv_to_rgb(hsv):
+    h, s, v = hsv[:, 0], hsv[:, 1], hsv[:, 2]
+    h = h * 6.0
+    i = np.floor(h).astype(int)
+    f = h - i
+    p = v * (1 - s)
+    q = v * (1 - s * f)
+    t = v * (1 - s * (1 - f))
+
+    r = np.zeros_like(h)
+    g = np.zeros_like(h)
+    b = np.zeros_like(h)
+
+    i = i % 6
+    for idx in range(6):
+        mask = i == idx
+        if idx == 0:
+            r[mask], g[mask], b[mask] = v[mask], t[mask], p[mask]
+        elif idx == 1:
+            r[mask], g[mask], b[mask] = q[mask], v[mask], p[mask]
+        elif idx == 2:
+            r[mask], g[mask], b[mask] = p[mask], v[mask], t[mask]
+        elif idx == 3:
+            r[mask], g[mask], b[mask] = p[mask], q[mask], v[mask]
+        elif idx == 4:
+            r[mask], g[mask], b[mask] = t[mask], p[mask], v[mask]
+        elif idx == 5:
+            r[mask], g[mask], b[mask] = v[mask], p[mask], q[mask]
+
+    rgb = np.stack([r, g, b], axis=1)
+    return (rgb * 255).clip(0, 255).astype(np.uint8)
+
+def normalize_hsv(hsv):
+    """
+    Normalize HSV values:
+    - H in degrees [0, 360) → [0, 1]
+    - S, V in percent [0, 100] → [0, 1]
+    
+    Input shape: (batch, 3)
+    Output shape: (batch, 3)
+    """
+    h = hsv[:, 0] / 360.0
+    s = hsv[:, 1] / 100.0
+    v = hsv[:, 2] / 100.0
+    return np.stack([h, s, v], axis=1)
+
+def denormalize_hsv(normalized_hsv):
+    """
+    Denormalize HSV values from [0, 1] back to:
+    - H in [0, 360)
+    - S, V in [0, 100]
+
+    Input shape: (batch, 3)
+    Output shape: (batch, 3)
+    """
+    h = normalized_hsv[:, 0] * 360.0
+    s = normalized_hsv[:, 1] * 100.0
+    v = normalized_hsv[:, 2] * 100.0
+    return np.stack([h, s, v], axis=1)
+def format_color_detect_output(result: torch.Tensor) -> list[tuple[np.ndarray,np.ndarray,bool]]:
     all_results = []
     
-    for colors,bg in zip(result[0].cpu().numpy(),result[1].cpu().numpy()):
-        colors = np.split(colors,[3])
-        colors = np.stack(colors)
+    # for colors,bg in zip(result[0].cpu().numpy(),result[1].cpu().numpy()):
+    #     colors = np.split(colors,[3])
+    #     colors = np.stack(colors)
+    #     colors = denormalize_lab_np(colors)
+    #     colors = lab_to_rgb_np(colors)
+    #     has_outline = True if bg > 0.5 else False
+    #     all_results.append((colors,has_outline))
+
+    for colors in result.cpu().numpy():
+        colors = np.array([colors])
         colors = denormalize_lab_np(colors)
         colors = lab_to_rgb_np(colors)
-        has_outline = True if bg > 0.5 else False
-        all_results.append((*colors,has_outline))
+        all_results.append((colors[0],np.array([255,255,255],dtype=np.uint8),False))
     
     return all_results
 #np.concatenate([draw_text_color,bg_color,np.array([1 if has_outline else 0])])

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from translator.color_detect.constants import IMAGE_SIZE
 from translator.color_detect.models import get_color_detection_model
-from translator.color_detect.utils import generate_color_detection_train_example, apply_transforms
+from translator.color_detect.training.utils import generate_color_detection_train_example, apply_transforms
 from translator.utils import display_image
 import cv2
 import os

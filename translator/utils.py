@@ -1,5 +1,6 @@
 import random
 import cv2
+
 import json
 import os
 import math
@@ -9,7 +10,6 @@ import torch
 import threading
 import pycountry
 import numpy as np
-import PySimpleGUI as sg
 import asyncio
 import inspect
 import largestinteriorrectangle as lir
@@ -127,36 +127,6 @@ def has_white(image: np.ndarray):
 
 
 display_image_lock = threading.Lock()
-
-
-def display_image(img: np.ndarray, name: str = "debug"):
-    global display_image_lock
-
-    with display_image_lock:
-        # Convert the CV2 image array to a format compatible with PySimpleGUI
-        image_bytes = cv2.imencode(".png", img)[1].tobytes()
-
-        # Create the GUI layout
-        layout = [
-            [sg.Text(text=name)],
-            [sg.Image(data=image_bytes)],
-            [sg.Button("Save"), sg.Button("Close")],
-        ]
-
-        # Create the window
-        window = sg.Window(name, layout)
-
-        # Event loop to handle events
-        while True:
-            event, values = window.read()
-            if event == sg.WINDOW_CLOSED or event == "Close":
-                break
-
-            if event == "Save":
-                cv2.imwrite(name + ".png", img)
-
-        # Close the window
-        window.close()
 
 
 def ensure_gray(img: np.ndarray):
@@ -1239,16 +1209,3 @@ def overlap_percent(box1: tuple[int,int,int,int], box2: tuple[int,int,int,int]) 
 
 def is_cuda_available():
     return torch.cuda.is_available() and torch.cuda.device_count() > 0
-
-def format_color_detect_output(result: tuple[torch.Tensor,torch.Tensor,torch.Tensor]) -> list[tuple[np.ndarray,np.ndarray,bool]]:
-    stacked = torch.cat(result,dim = 1)
-
-    all_results = []
-    
-    for stack in stacked:
-        fg = (stack[:3].cpu().numpy() * 255).astype(np.uint8)
-        outline = (stack[3:6].cpu().numpy() * 255).astype(np.uint8)
-        has_outline = stack[6].cpu().numpy() > 0.5
-        all_results.append((fg,outline,has_outline))
-    
-    return all_results

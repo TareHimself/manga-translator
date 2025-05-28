@@ -3,6 +3,7 @@ import timm
 import torch
 import torch.functional as F
 import torch.nn as nn
+from torchvision.models import resnet18, ResNet18_Weights
 from torchvision import transforms
 from vit_pytorch import ViT
 from constants import IMAGE_SIZE
@@ -10,10 +11,10 @@ train_augmenter = transforms.Compose(
     [
         # transforms.RandomAdjustSharpness(sharpness_factor=2),
         # transforms.RandomAutocontrast(),
-        transforms.RandomRotation(degrees=(0, 360),interpolation=transforms.InterpolationMode.NEAREST),
-        transforms.RandomAffine(degrees = 0, translate = (0.2, 0.2)),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomHorizontalFlip()
+        # transforms.RandomRotation(degrees=(0, 360),interpolation=transforms.InterpolationMode.NEAREST),
+        # transforms.RandomAffine(degrees = 0, translate = (0.2, 0.2)),
+        # transforms.RandomVerticalFlip(),
+        # transforms.RandomHorizontalFlip()
     ]
 )
 
@@ -55,7 +56,7 @@ class ResnetFeatureExtractor(nn.Module):
         super().__init__()
         self.ex = get_timm_model(lambda x : nn.Linear(x, out_features),
             channels=3,
-            model_name="resnet34")
+            model_name="resnet18")
 
     def forward(self,x):
         return self.ex(x)
@@ -81,34 +82,21 @@ class ViTFeatureExtractor(nn.Module):
 class ColorDetectionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.ex = ResnetFeatureExtractor(2048)
-        self.border_color = nn.Sequential(
+        self.ex = resnet18(weights = ResNet18_Weights.IMAGENET1K_V1)
+        self.ex.fc = nn.Identity()
+        self.fc_color = nn.Sequential(
+            nn.Linear(512,256),
             nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(2048, 512),
+            nn.Dropout(0.3),
+            nn.Linear(256, 6)  # 3 for text color, 3 for border color
+        )
+        self.fc_border = nn.Sequential(
+            nn.Linear(512,128),
             nn.ReLU(),
-            nn.Linear(512, 3),
+            nn.Dropout(0.3),
+            nn.Linear(128, 1),   # 1 for binary
             nn.Sigmoid()
-            #ClampModule(min=0,max=1)
-            )
-        self.text_color = nn.Sequential(
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(2048, 512),
-            nn.ReLU(),
-            nn.Linear(512, 3),
-            nn.Sigmoid()
-            #ClampModule(min=0,max=1)
-            )
-        self.has_boarder = nn.Sequential(
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(2048, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1),
-            nn.Sigmoid()
-            #ClampModule(min=0,max=1)
-            )
+        )
 
     def forward(self,x):
         # if self.training:
@@ -117,7 +105,7 @@ class ColorDetectionModel(nn.Module):
         # display_image(to_display,"Train Augmentation Debug")
         features = self.ex(x)
 
-        return self.text_color(features), self.border_color(features), self.has_boarder(features)
+        return self.fc_color(features), self.fc_border(features)
         
 def get_color_detection_model(
     device=torch.device("cpu"),

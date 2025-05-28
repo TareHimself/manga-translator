@@ -4,8 +4,6 @@ import numpy as np
 from translator.pipelines.pipeline import Pipeline
 from ultralytics import YOLO
 from translator.utils import (
-    display_image,
-    format_color_detect_output,
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
     TranslatorGlobals,
@@ -13,14 +11,15 @@ from translator.utils import (
     get_model_path,
     apply_mask
 )
-from translator.color_detect.utils import apply_transforms
+from translator.color_detect.training.utils import apply_transforms
 import traceback
 import threading
 import torch
 import asyncio
 from typing import Union
 from concurrent.futures import ThreadPoolExecutor
-from translator.color_detect.models import get_color_detection_model
+from translator.color_detect.training.utils import format_color_detect_output
+from translator.color_detect.model import get_color_detection_model
 from translator.core.plugin import Drawable, Translator, Ocr, Drawer, Cleaner
 from translator.cleaners.deepfillv2 import DeepFillV2Cleaner
 from translator.drawers.horizontal import HorizontalDrawer
@@ -85,7 +84,8 @@ class DefaultImageToImagePipeline(ImageToImagePipeline):
                 self.color_detect_model = None
         except:
             self.color_detect_model = None
-            traceback.print_exc()
+            if debug:
+                traceback.print_exc()
 
         self.translate_free_text = translate_free_text
         self.translator = translator
@@ -326,7 +326,6 @@ class DefaultImageToImagePipeline(ImageToImagePipeline):
                 with torch.no_grad():  # model needs work
                     with torch.inference_mode():
                         with self.frame_process_mutex:  # this may not be needed
-
                             images = [apply_transforms(frame_with_text.copy()) for _, frame_with_text in to_translate]
 
                             draw_colors = [x for x in format_color_detect_output(self.color_detect_model(

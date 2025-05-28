@@ -3,35 +3,38 @@ import torch.nn as nn
 import copy
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from dataset import ColorDetectionDataset
-from model import get_color_detection_model
+from .dataset import ColorDetectionDataset
+from translator.color_detect.model import get_color_detection_model
 
 
 def train_model(
     num_samples=6000,
-    num_workers=7,
+    num_workers=12,
     backgrounds=[],
     epochs=1000,
-    batch_size=32,
-    learning_rate=0.001,
+    batch_size=128,
+    learning_rate=0.0001,
     weights_path=None,
-    seed=200,
+    seed=90,#200,
     patience = 50,
     use_fp16 = False,
-    device=torch.device("cuda:0"),
+    dataset = None,
+    device=torch.device("cuda:0")
 ) -> torch.nn.Module:
+    
+
     dataset = ColorDetectionDataset(
         generate_target=num_samples,
         backgrounds=backgrounds,
         generator_seed=seed,
         num_workers=num_workers,
-    )
+    ) if dataset is None else dataset
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model = get_color_detection_model(weights_path=weights_path, device=device)
     model.train()
-    color_criteron = nn.MSELoss()
+    color_criteron = nn.HuberLoss()
     border_criteron = nn.BCELoss()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -53,19 +56,18 @@ def train_model(
                 images = images.type(torch.FloatTensor).to(device)
                 results = results.type(torch.FloatTensor).to(device)
 
-                color_expected,has_border_expected = results[:, :6],results[:,6].unsqueeze(1)
+                color_expected = results[:, :3]
 
-                color,has_border = model(images)
+                color = model(images)
+                # ones = torch.ones_like(has_border_expected)
+                # mask = torch.concatenate([ones,ones,ones,has_border_expected,has_border_expected,has_border_expected],dim=1)
+                # color_expected_masked = color_expected * mask
+                # color_masked = color * mask
 
-                mask = has_border_expected.unsqueeze(1)
+                # color_loss = color_criteron(color_masked,color_expected_masked)
 
-                border_loss = border_criteron(has_border,has_border_expected)
-
-                color_expected_masked = color_expected * mask
-                color_masked = color * mask
-                color_loss = color_criteron(color_masked,color_expected_masked)
-
-                loss = color_loss + border_loss
+                color_loss = color_criteron(color,color_expected)
+                loss = color_loss
 
                 optimizer.zero_grad()
 

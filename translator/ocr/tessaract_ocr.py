@@ -8,7 +8,7 @@ from translator.core.plugin import (
     PluginSelectArgument,
     PluginSelectArgumentOption,
 )
-from translator.utils import display_image, resize_and_pad, ensure_gray, adjust_contrast_brightness
+from translator.utils import  resize_and_pad, ensure_gray, adjust_contrast_brightness
 
 class TesseractOcr(Ocr):
     """Supports all the languages listed"""

@@ -4,7 +4,6 @@ import numpy as np
 import sys
 from ultralytics import YOLO
 from translator.utils import (
-    display_image,
     mask_text_and_make_bubble_mask,
     get_bounds_for_text,
     TranslatorGlobals,
@@ -12,7 +11,7 @@ from translator.utils import (
     get_model_path,
     apply_mask
 )
-from translator.color_detect.utils import apply_transforms
+from translator.color_detect.training.utils import apply_transforms
 import traceback
 import threading
 import torch
@@ -76,7 +75,9 @@ class FullConversion:
                 self.color_detect_model = None
         except:
             self.color_detect_model = None
-            traceback.print_exc()
+            print("Failed to load color detection model")
+            if debug:
+               traceback.print_exc()
 
         self.translate_free_text = translate_free_text
         self.translator = translator
@@ -369,7 +370,7 @@ class FullConversion:
                     
 
                 print(f"Drawing => {time.time() - start} seconds")
-            return frame
+            return frame_clean#frame
         except:
             traceback.print_exc()
             return input_frame

@@ -28,7 +28,7 @@ class DeepLTranslator(Translator):
             )
         ]
     
-    async def do_api(self,result: OcrResult):
+    async def do_api(self,result: OcrResult,tries = 0):
         if self.auth_token is None or len(self.auth_token.strip()) == 0:
             return TranslatorResult("Need DeepL Auth")
 
@@ -50,11 +50,15 @@ class DeepLTranslator(Translator):
                             "Authorization": f"DeepL-Auth-Key {self.auth_token}",
                             "Content-Type": "application/x-www-form-urlencoded",
                         }) as response:
-
+                        if response.content_type == "text/html":
+                            if tries > 4:
+                                return TranslatorResult("Rate limited")
+                            await asyncio.sleep(0.1)
+                            return await self.do_api(result= result,tries= tries + 1)
                         data = await response.json()
                         
                         return TranslatorResult(
-                            data["translations"][0]["text"],lang_code="ja"
+                            data["translations"][0]["text"],lang_code="en"
                         )
             except:
                 traceback.print_exc()

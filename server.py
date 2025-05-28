@@ -143,7 +143,7 @@ class TranslateFromWebHandler(RequestHandler):
                 ocr=get_ocr()[ocr_id](**ocr_params),
                 drawer=get_drawers()[drawer_id](**drawer_params),
                 cleaner=get_cleaners()[cleaner_id](**cleaner_params),
-                color_detect_model=None,
+                #color_detect_model=None,
             )
 
             results = await converter([image_cv2])

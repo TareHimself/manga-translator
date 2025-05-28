@@ -19,10 +19,9 @@ from translator.utils import (
     pil_to_cv2,
     wrap_text,
     get_fonts,
-    display_image,
     TranslatorGlobals
 )
-from translator.color_detect.utils import luminance_similarity
+from translator.color_detect.training.utils import luminance_similarity
 
 
 class HorizontalDrawer(Drawer):

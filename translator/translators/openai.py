@@ -30,7 +30,7 @@ class OpenAiTranslator(Translator):
         super().__init__()
         import openai
         
-        api_key = os.getenv("OPENAI_API_KEY")
+        #api_key = os.getenv("OPENAI_API_KEY")
 
         if not api_key:
             raise ValueError("Missing OpenAI API key")

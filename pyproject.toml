@@ -21,7 +21,6 @@ numpy = "^1.26.2"
 jaconv = "^0.3.4"
 faker = "^20.1.0"
 easyocr = "^1.7.1"
-pysimplegui = "^4.60.5"
 largestinteriorrectangle = "^0.2.0"
 ultralytics = "8.2.76"
 fugashi = "^1.3.0"
@@ -36,7 +35,7 @@ pyphen = "^0.15.0"
 
 [tool.poe.tasks]
 uninstall-torch = "python -m pip uninstall -y torch torchvision"
-install-torch-cuda = "python -m pip install torch==2.0.1 torchvision --index-url https://download.pytorch.org/whl/cu117"
+install-torch-cuda = "python -m pip install torch==2.4.0 torchvision --index-url https://download.pytorch.org/whl/cu117"
 build-ui = "npm install && npm run build"
 run-server = "python server.py"
 force-cuda = ["uninstall-torch","install-torch-cuda"]

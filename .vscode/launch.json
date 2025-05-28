@@ -11,7 +11,16 @@
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["-f","${input:folder}"]
+            "args": ["-f","${input:folder}"],
+        },
+        {
+            "name": "Debug Color Detection Train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_color_detect.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Debug Server",

@@ -7,44 +7,51 @@ import math
 import numpy as np
 import os
 from constants import IMAGE_SIZE
-from utils import generate_color_detection_train_example, apply_transforms
+from utils import (
+    generate_color_detection_train_example,
+    apply_transforms,
+    lab_to_rgb_np,
+    rgb_to_lab_np,
+    normalize_lab_np,
+    denormalize_lab_np,
+)
 
 
 class ColorDetectionDataset(Dataset):
     def __init__(
         self,
         generate_target=0,
-        generate_size: tuple[int, int] = (IMAGE_SIZE * 2, IMAGE_SIZE * 2),
-        min_generate_size: tuple[int, int] = (round(IMAGE_SIZE / 2), round(IMAGE_SIZE / 2)),
-        backgrounds: list =[],
+        generate_size: tuple[int, int] = (IMAGE_SIZE, IMAGE_SIZE),
+        min_generate_size: tuple[int, int] = (round(IMAGE_SIZE), round(IMAGE_SIZE)),
+        backgrounds: list = [],
         generator_seed=0,
         languages: list[str] = ["en_US"],
         fonts: list[list[str]] = [
             [
-    'fonts/Roboto-MediumItalic.ttf',
-    'fonts/Roboto-Regular.ttf',
-    'fonts/Roboto-Thin.ttf',
-    'fonts/Roboto-ThinItalic.ttf',
-    'fonts/Roboto-Black.ttf',
-    'fonts/Roboto-BlackItalic.ttf',
-    'fonts/Roboto-Bold.ttf',
-    'fonts/Roboto-BoldItalic.ttf',
-    'fonts/Roboto-Italic.ttf',
-    'fonts/Roboto-Light.ttf',
-    'fonts/Roboto-LightItalic.ttf',
-    'fonts/Roboto-Medium.ttf',
-],
-[
-    'fonts/NotoSansJP-ExtraLight.ttf',
-    'fonts/NotoSansJP-Light.ttf',
-    'fonts/NotoSansJP-Medium.ttf',
-    'fonts/NotoSansJP-Regular.ttf',
-    'fonts/NotoSansJP-SemiBold.ttf',
-    'fonts/NotoSansJP-Thin.ttf',
-    'fonts/NotoSansJP-Black.ttf',
-    'fonts/NotoSansJP-Bold.ttf',
-    'fonts/NotoSansJP-ExtraBold.ttf'
-]
+                "fonts/Roboto-MediumItalic.ttf",
+                "fonts/Roboto-Regular.ttf",
+                "fonts/Roboto-Thin.ttf",
+                "fonts/Roboto-ThinItalic.ttf",
+                "fonts/Roboto-Black.ttf",
+                "fonts/Roboto-BlackItalic.ttf",
+                "fonts/Roboto-Bold.ttf",
+                "fonts/Roboto-BoldItalic.ttf",
+                "fonts/Roboto-Italic.ttf",
+                "fonts/Roboto-Light.ttf",
+                "fonts/Roboto-LightItalic.ttf",
+                "fonts/Roboto-Medium.ttf",
+            ],
+            [
+                "fonts/NotoSansJP-ExtraLight.ttf",
+                "fonts/NotoSansJP-Light.ttf",
+                "fonts/NotoSansJP-Medium.ttf",
+                "fonts/NotoSansJP-Regular.ttf",
+                "fonts/NotoSansJP-SemiBold.ttf",
+                "fonts/NotoSansJP-Thin.ttf",
+                "fonts/NotoSansJP-Black.ttf",
+                "fonts/NotoSansJP-Bold.ttf",
+                "fonts/NotoSansJP-ExtraBold.ttf",
+            ],
         ],
         num_workers=5,
     ) -> None:
@@ -84,19 +91,40 @@ class ColorDetectionDataset(Dataset):
 
         loader = tqdm(total=generate_target, desc="Generating Samples")
 
-        def make_sample(*items):
+        def make_sample(start,phrases):
             nonlocal num_generated
-            for phrase in items:
+            for idx in range(len(phrases)):
+                phrase = phrases[idx]
+                abs_idx = start + idx
                 if stop_threads_event.is_set():
                     break
 
                 example, example_color = generate_color_detection_train_example(
                     phrase,
-                    background=generator.choice(backgrounds + [(np.random.rand(*generate_size[::-1],3) * 255).astype(np.uint8)]),
-                    size=[generator.randrange(min_generate_size[0],generate_size[0]), generator.randrange(min_generate_size[0],generate_size[1])],
+                    background=generator.choice(
+                        backgrounds
+                        + [
+                            (np.random.rand(*generate_size[::-1], 3) * 255).astype(
+                                np.uint8
+                            )
+                        ]
+                    ),
+                    size=[
+                        (
+                            generator.randrange(min_generate_size[0], generate_size[0])
+                            if min_generate_size[0] != generate_size[0]
+                            else generate_size[0]
+                        ),
+                        (
+                            generator.randrange(min_generate_size[0], generate_size[1])
+                            if min_generate_size[1] != generate_size[1]
+                            else generate_size[1]
+                        ),
+                    ],
                     font_file=generator.choice(self.fonts[faker_index]),
                     # shift_max=max_text_offset,
                     generator=generator,
+                    force_outline= True if abs_idx % 2 == 0 else False
                 )
 
                 # print(example_color)
@@ -104,19 +132,20 @@ class ColorDetectionDataset(Dataset):
                 # print(label,phrase)
                 # debug_image(example,"Generated sample")
                 # executor.submit(add_sample,label,example)
-                
+
                 self.examples.append(example)
                 label = example_color.astype(np.float32)
-                label[:6] = label[:6] / 255
+                color_lab = rgb_to_lab_np(np.array([label[:3], label[3:6]]))
+                color_lab = normalize_lab_np(color_lab)
+                label[:6] = np.concatenate(color_lab,axis=0)
                 self.labels.append(label)
                 loader.update()
                 num_generated += 1
 
         amount_per_section = math.ceil(len(faker_phrases) / num_workers)
-        sections = [
-            faker_phrases[x * amount_per_section : (x + 1) * amount_per_section]
-            for x in range(num_workers)
-        ]
+        sections = []
+        for x in range(num_workers):
+            sections.append([x,faker_phrases[x * amount_per_section : (x + 1) * amount_per_section]])
 
         pending = [
             Thread(target=make_sample, daemon=True, group=None, args=section)
