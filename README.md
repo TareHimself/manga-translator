@@ -25,7 +25,8 @@ Extensible manga translator
 
 ## Install
 - This repo uses [uv](https://github.com/astral-sh/uv), see individual folders for specifics
-
+<!--
+Links are currently down, and I'm not sure when I will be able to bring them back up
 ## Datasets
 
 ### Detection
@@ -39,7 +40,7 @@ Extensible manga translator
 <a href="https://universe.roboflow.com/tarehimself/manga-translator-segmentation">
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
-
+-->
 ##  Examples
 
 <table>
