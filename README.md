@@ -5,6 +5,14 @@
 ## What
 Extensible manga translator
 
+## Install
+- This repo uses [uv](https://github.com/astral-sh/uv) for package management, see individual parts below for specifics
+- 
+## Parts
+- [Actual Translator](./translator/README.md)
+- A [UI](./ui/README.md) for translating individual images
+- A basic [CLI](./cli/README.md) example
+  
 ## Limitations
 - Yolo by ultralytics is AGPL, need to find alternative detector and segmenter (or maybe remove from repo so repo is not AGPL)
 - Currently no form of text color detection so text will always be black
@@ -18,13 +26,6 @@ Extensible manga translator
 - deepfillv2 inpainting
 - lama inpainting
 
-## Parts
-- [Actual Translator](./translator/README.md)
-- A [UI](./ui/README.md) for translating individual images
-- A basic [CLI](./cli/README.md) example
-
-## Install
-- This repo uses [uv](https://github.com/astral-sh/uv), see individual folders for specifics
 <!--
 Links are currently down, and I'm not sure when I will be able to bring them back up
 ## Datasets
