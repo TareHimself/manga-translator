@@ -11,7 +11,7 @@ Extensible manga translator
 - Only horizontal left to right text layout is supported for output
 - Very large vertical images are not split so either they work or they dont
 - Dataset is only japanese text so detection might not work on other languages
-- Aside from the yolo models (because I likely trained those) all other models are general purpose and may or maynot work well on manga
+- Aside from the yolo models, all other models are general-purpose and may or may not work well on manga
 
 ## Models Included
 - Yolo detection and segmentation
