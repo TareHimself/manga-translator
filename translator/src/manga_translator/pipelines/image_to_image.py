@@ -108,6 +108,9 @@ class ImageToImagePipeline(Pipeline):
 
             translatable_frames.append(TranslatableFrame(i,input_images[i],detections[i],segments[i]))
 
+        if len(translatable_frames) == 0:
+            return results
+        
         raw_translatable_frames = [item.frame for item in translatable_frames]
         detections = [item.detections for item in translatable_frames]
         segments = [item.segments for item in translatable_frames]
