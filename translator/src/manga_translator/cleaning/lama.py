@@ -42,9 +42,8 @@ class LamaCleaner(Cleaner):
     def __init__(
         self,
         model_path: str,
-        batch_size=1,
         inpaint_patches=True,
-        patch_padding = 2,
+        patch_padding = 10,
         device: torch.device = get_default_torch_device(),
     ) -> None:
         super().__init__()
@@ -188,7 +187,7 @@ class LamaCleaner(Cleaner):
                 "patch_padding",
                 "Patch Padding",
                 "Padding to apply to patches for inpainting context",
-                2,
+                10,
             ),
             PytorchDevicePluginSelectArgument("device", "Device"),
         ]
