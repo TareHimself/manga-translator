@@ -1,0 +1,30 @@
+pipeline:
+  detector:
+    class: YoloDetector
+    args:
+      model_path: PATH TO MODEL HERE
+      device: cuda
+  segmenter:
+    class: YoloSegmenter
+    args:
+      model_path: PATH TO MODEL HERE
+      device: cuda
+  translator:
+    class: DeepLTranslator
+    args:
+      auth_key: DEEPL AUTH KEY HERE
+  cleaner:
+    class: OpenCvCleaner
+    args:
+  drawer:
+    class: HorizontalDrawer
+    args:
+      font_file: PATH TO FONT FILE HERE
+  ocr:
+    class: MangaOcr
+    args:
+      device: cuda
+  color_detector:
+    class: Default
+    args:
+  

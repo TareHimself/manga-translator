@@ -1,6 +1,0 @@
-train: 'detection/train/images'
-val: 'detection/valid/images'
-test: 'detection/test/images'
-
-nc: 2
-names: ['text_bubble', 'text_free']

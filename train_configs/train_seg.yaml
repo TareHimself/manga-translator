@@ -1,6 +1,0 @@
-train: 'segmentation/train/images'
-val: 'segmentation/valid/images'
-test: 'segmentation/test/images'
-
-nc: 1
-names: ['text_bubble']
