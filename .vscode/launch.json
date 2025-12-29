@@ -13,6 +13,15 @@
             "justMyCode": true,
             "args": ["-f","${input:folder}"],
         },
+         {
+            "name": "Debug Translator",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/translator/src/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/translator"
+        },
         {
             "name": "Debug Color Detection Train",
             "type": "debugpy",

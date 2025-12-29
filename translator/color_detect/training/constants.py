@@ -1,1 +1,0 @@
-IMAGE_SIZE = 256

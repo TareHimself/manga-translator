@@ -1,77 +1,30 @@
 # Manga Translator
 
-<img src="assets/examples/ui_09_11_23.png"/>
+<img src="assets\examples\ui_2025-12-27.png"/>
 
-## Why ?
+## What
+Extensible manga translator
 
-- Boy read manga.
-- Boy reach latest chapter.
-- Chapter not translated.
-- Boy get mad.
-- Boy do code instead of waiting like a normal person.
+## Limitations
+- Yolo by ultralytics is AGPL, need to find alternative detector and segmenter (or maybe remove from repo so repo is not AGPL)
+- Currently no form of text color detection so text will always be black
+- Only horizontal left to right text layout is supported for output
+- Very large vertical images are not split so either they work or they dont
+- Dataset is only japanese text so detection might not work on other languages
+- Aside from the yolo models (because I likely trained those) all other models are general purpose and may or maynot work well on manga
 
-## How ?
+## Models Included
+- Yolo detection and segmentation
+- deepfillv2 inpainting
+- lama inpainting
 
-- [Yolo](https://github.com/ultralytics/ultralytics) for bubble recognition and text segmentation
-- Open CV for bubble and masking
-- PIL for text replacement
-- Api's or neural networks for translation
-- Deepfillv2 for inpainting and bubble cleanup
-
-## Progress
-
-- [x] Bubble inpainting using [deepfillv2](https://github.com/nipponjo/deepfillv2-pytorch)
-- [x] Bubble recognition (should improve with more training data)
-- [x] Free text recognition (should improve with more training data)
-- [x] Bubble text extraction
-- [x] Bubble masking
-- [x] Bubble text insertion
-- [x] Bubble Text ocr
-- [x] Bubble Text translation
-- [x] Bubble Text hypenation
-- [x] Format and structure dataset
-- [x] Create converters i.e. yolo => coco, my dataset => yolo etc
-- [ ] Detection of text color
-- [ ] Better free text ocr
-- [ ] Better free text translation
-- [ ] Improve text resize algorithm, some texts are too small/big
-- [x] Implement [lama](https://github.com/advimman/lama) for cleaning
-
-## Models
-
-- Available in the latest release
+## Parts
+- [Actual Translator](./translator/README.md)
+- A [UI](./ui/README.md) for translating individual images
+- A basic [CLI](./cli/README.md) example
 
 ## Install
-
-- setup [Anaconda](https://www.anaconda.com/download)
-- clone this repository
-- Open a terimal in the cloned repository
-- Run the following
-
-```py
-conda create -n manga-translator python=3.10
-conda activate manga-translator
-conda install -c conda-forge poetry
-
-poetry install
-# For cuda support run "poe force-cuda"
-```
-
-- Download models to models/modelname (i.e. models/detection.pt)
-  
-## Usage
-
-### UI
-
-```bash
-poe run-server
-```
-
-### CLI
-
-```bash
-python main.py -f image1.png image2.png
-```
+- This repo uses [uv](https://github.com/astral-sh/uv), see individual folders for specifics
 
 ## Datasets
 
@@ -87,7 +40,7 @@ python main.py -f image1.png image2.png
     <img src="https://app.roboflow.com/images/download-dataset-badge.svg"></img>
 </a>
 
-## assets/examples
+##  Examples
 
 <table>
    <thead>
@@ -165,9 +118,9 @@ python main.py -f image1.png image2.png
       </tr>
    </tbody>
 </table>
-
+<!-- 
 ## Glossary
 
 - Bubble: a speech bubble
 - Free text: text found on pages but not in speech bubbles
-- Bubble Text: text within speech bubbles
+- Bubble Text: text within speech bubbles -->
