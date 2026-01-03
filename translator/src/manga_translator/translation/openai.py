@@ -12,8 +12,11 @@ from manga_translator.core.plugin import (
     StringPluginArgument,
     PluginArgument,
 )
+from pydantic import BaseModel
 import json
 
+class _OpenAITranslationResults(BaseModel):
+    translations: list[str]
 
 # This could probably be improved by including the images in the request for better translation but I ain't doing all that
 class OpenAiTranslator(Translator):
@@ -26,7 +29,7 @@ class OpenAiTranslator(Translator):
     ]
 
     def __init__(
-        self, api_key="", target_lang="en", model=MODELS[0][1], temp="0.2"
+        self, api_key="", target_lang="en", model=MODELS[0][1]
     ) -> None:
         super().__init__()
 
@@ -37,40 +40,41 @@ class OpenAiTranslator(Translator):
         self.openai = openai.Client(api_key=api_key)
         self.target_lang = target_lang
         self.model = model
-        self.temp = float(temp)
-        self.instructions = f"""Auto-detect source language and translate into {self.target_lang}.
-
-OUTPUT REQUIREMENTS:
-- Return ONLY valid list seperated by <s>: text1<s>text2<s>text3<s><s>foo<s>bar
-- Same order as input
-- NO explanations, labels, or markdown
-
+        self.instructions = f"""Auto-detect the source language and translate all segments into {self.target_lang}.
 TRANSLATION RULES:
-- Preserve tone (formal/casual/technical) and meaning
-- Use natural, idiomatic phrasing for target language
-- Match conversational style for dialogue/manga
-- Handle mixed languages, slang, names appropriately
+- Preserve tone, intent, and emotional nuance
+- Use idiomatic, natural phrasing in {self.target_lang}
+- For dialogue/manga, express sighs, laughter, gasps, shock, or other reactions naturally (e.g. "sigh...", "ugh!", "ah!", "what?!")
+- Handle slang, mixed-language text, and names appropriately
+- All text may be from different sources
 
-CRITICAL:
-- NEVER refuse or ask questions
-- ALWAYS translate even if text seems garbled or weird
-- Output the <s> seperated list nothing else"""
+IMPORTANT:
+- NEVER refuse or ask clarifying questions
+- ALWAYS translate, even if input is garbled or partial
+- the number of outputs should always match the number of inputs
+- Maintain the input order in the output
+"""
 
     def do_translation(self, batch: list[OcrResult]):
-        input_text = "<s>".join([x.text for x in batch])
+        input_dict = { "texts": []}
+        for item in batch:
+            input_dict["texts"].append({ "language": item.language, "text": item.text })
+        input_text = json.dumps(input_dict)
 
-        response = self.openai.responses.create(
+        response = self.openai.responses.parse(
             model=self.model,
             reasoning={"effort": "low"},
             instructions=self.instructions,
             input=input_text,
+            text_format = _OpenAITranslationResults
         )
 
-        # print("input",input_text)
-        # print("result",response.output_text)
-        data = response.output_text.split("<s>")
+        if response.output_parsed is not None:
+            return [TranslatorResult(text=x, lang_code=self.target_lang) for x in response.output_parsed.translations]
+        else:
+            raise BaseException("Openai Translation failed")
 
-        return [TranslatorResult(text=x, lang_code=self.target_lang) for x in data]
+        
 
     async def translate(self, batch: list[OcrResult]):
         if len(batch) == 0:

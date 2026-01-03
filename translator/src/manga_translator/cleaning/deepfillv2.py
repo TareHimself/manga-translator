@@ -141,6 +141,26 @@ class DeepFillV2Cleaner(Cleaner):
                     + patch.actual_size[0],
                 ]
 
+    def mask_only_detected_areas(
+        self,
+        frames: list[np.ndarray],
+        cleaned_frames: list[np.ndarray],
+        detections: list[list[DetectionResult]],
+    ):
+        results: list[np.ndarray] = []
+        for frame, cleaned, frame_detections in zip(frames, cleaned_frames, detections):
+            h, w = frame.shape[:2]
+            mask = np.zeros((h, w), dtype=np.uint8)
+            for detection in frame_detections:
+                x1, y1, x2, y2 = detection.bbox
+                cv2.rectangle(mask, (x1, y1), (x2, y2), 255, thickness=-1)
+
+            a = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask))
+            b = cv2.bitwise_and(cleaned, cleaned, mask=mask)
+            results.append(cv2.add(a, b))
+        return results
+
+    # might be a better way to do this since areas that may be clipped by detections are still inpainted
     async def clean(
         self,
         frames: list[np.ndarray],
@@ -148,9 +168,11 @@ class DeepFillV2Cleaner(Cleaner):
         segments: list[list[SegmentationResult]] = [],
         detections: list[list[DetectionResult]] = [],
     ) -> list[np.ndarray]:
-        results = [x.copy() for x in frames]
+        ai_cleaned = [x.copy() for x in frames]
         if self.inpaint_patches:
-            patches = await asyncio.to_thread(self.extract_patches, results, segments)
+            patches = await asyncio.to_thread(
+                self.extract_patches, ai_cleaned, segments
+            )
         else:
             patches = [
                 _DeepFillV2ImagePatch(
@@ -164,7 +186,9 @@ class DeepFillV2Cleaner(Cleaner):
                 for frame, mask in zip(frames, masks)
             ]
         await asyncio.to_thread(self.clean_patches, patches)
-        return results
+        return await asyncio.to_thread(
+            self.mask_only_detected_areas, frames, ai_cleaned, detections
+        )
 
     @staticmethod
     def get_name() -> str:

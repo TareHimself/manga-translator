@@ -43,7 +43,7 @@ Links are currently down, and I'm not sure when I will be able to bring them bac
 </a>
 -->
 ##  Examples
-
+Image used solely for demonstrating translation functionality. All rights belong to the original copyright holder
 <table>
    <thead>
       <tr>

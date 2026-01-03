@@ -1,7 +1,7 @@
 from manga_translator.core.plugin import Drawer
 from manga_translator.drawing.horizontal import HorizontalDrawer
 
-_data = list(
+_drawing_data = list(
     filter(
         lambda a: a.is_valid(),
         [HorizontalDrawer],
@@ -10,4 +10,4 @@ _data = list(
 
 
 def get_drawers() -> list[Drawer]:
-    return _data
+    return _drawing_data

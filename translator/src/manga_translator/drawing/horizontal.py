@@ -24,7 +24,7 @@ class HorizontalDrawer(Drawer):
         font_file="fonts/animeace2_reg.ttf",
         max_font_size=20,
         min_font_size=5,
-        line_spacing=0,
+        line_spacing=2,
         hyphenator: Union[pyphen.Pyphen, None] = pyphen.Pyphen(lang="en"),
         margin=3,
     ) -> None:
@@ -75,7 +75,7 @@ class HorizontalDrawer(Drawer):
 
         font = ImageFont.truetype(self.font_file, size=fit_result.font_size)
 
-        stroke_width = 1
+        outline_width = 1
 
         text_bounds = np.array(fit_result.wrap.bounds)
         available_space_y = frame_h
@@ -106,8 +106,8 @@ class HorizontalDrawer(Drawer):
                 str(text),
                 fill=(0, 0, 0, 255),
                 font=font,
-                # stroke_width=stroke_width,
-                # stroke_fill=(255,255,255,255) if stroke_width > 0 else None
+                stroke_width=outline_width,
+                stroke_fill=(255,255,255,255) if outline_width > 0 else None
             )
 
             pen_mask.text(
@@ -118,7 +118,7 @@ class HorizontalDrawer(Drawer):
                 str(text),
                 fill=(255, 255, 255, 255),
                 font=font,
-                stroke_width=stroke_width,
+                stroke_width=outline_width,
                 stroke_fill=(255, 255, 255, 255),
             )
 

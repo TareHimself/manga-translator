@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Manga Translator Extension",
+  "version": "1.0.0",
+  "description": "An extension that lets you translate manga using a compatible endpoint",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "icons": {
+   "128": "extension_icon128.png"
+ },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": ["page_styles.css"]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+pipeline:
+  detector:
+    class: YoloDetector
+    args:
+      model_path: ./resources/yolo_detection.pt
+      device: cuda
+  segmenter:
+    class: YoloSegmenter
+    args:
+      model_path: ./resources/yolo_segmentation.pt
+      device: cuda
+  translator:
+    class: OpenAiTranslator
+    args:
+      api_key: 
+      target_lang: en
+      model: gpt-5-nano-2025-08-07
+  ocr:
+    class: OpenAiOCR
+    args:
+      api_key: 
+      model: gpt-5-nano-2025-08-07
+  drawer:
+    class: HorizontalDrawer
+    args:
+      font_file: ./resources/animeace2_reg.ttf
+      max_font_size: 30
+      line_spacing: 2
+  cleaner:
+    class: LamaCleaner
+    args:
+      model_path: ./resources/lama_cleaning.pt
+      device: cuda

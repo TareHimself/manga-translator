@@ -5,13 +5,13 @@ from manga_translator.translation.openai import OpenAiTranslator
 from manga_translator.translation.debug import DebugTranslator
 from manga_translator.translation.pipe import PipeTranslator
 
-_data = list(
+_translator_data = list(
     filter(
         lambda a: a.is_valid(),
         [
             DebugTranslator,
-            HuggingFaceTranslator,
             DeepLTranslator,
+            HuggingFaceTranslator,
             OpenAiTranslator,
             PipeTranslator,
         ],
@@ -20,4 +20,4 @@ _data = list(
 
 
 def get_translators() -> list[Translator]:
-    return _data
+    return _translator_data

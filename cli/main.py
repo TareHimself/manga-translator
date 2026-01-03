@@ -4,9 +4,8 @@ import os
 from typing import Type
 import cv2
 import yaml
-from manga_translator.get import construct_plugin_by_name
-from manga_translator.pipelines.image_to_image import ImageToImagePipeline
-
+from manga_translator.get import construct_image_to_image_pipeline_from_config
+    
 class SmartFormatter(argparse.HelpFormatter):
     def _split_lines(self, text, width):
         if text.startswith("R|"):
@@ -19,6 +18,8 @@ class SmartFormatter(argparse.HelpFormatter):
 def write_image(source_path,destination,image):
     dest_name = os.path.basename(source_path)
     cv2.imwrite(os.path.join(destination,dest_name),image)
+
+
 
 async def main():
     parser = argparse.ArgumentParser(
@@ -68,43 +69,29 @@ async def main():
     config_file_path = os.path.abspath(args.config)
 
     os.makedirs(output_dir,exist_ok=True)
+    
+    pipeline = construct_image_to_image_pipeline_from_config(config_path=config_file_path)
 
-    with open(config_file_path,'r') as file:
-        data: dict = yaml.safe_load(file)["pipeline"]
-        pipeline_args = {}
-        for arg_name in data.keys():
-            arg_data = data[arg_name]
-            if arg_data["class"] == "Default":
-                continue
-
-            arg_args = arg_data["args"]
-            if arg_args is None:
-                arg_args = {}
-
-            pipeline_args[arg_name] = construct_plugin_by_name(arg_data["class"],arg_args)
+    for batch_start in range(0, len(files), batch_size):
         
-        pipeline = ImageToImagePipeline(**pipeline_args)
+        print(f"Processing batch [{batch_start} : {batch_start + batch_size}]")
+        target_files = files[batch_start : batch_start + batch_size]
+        images = await asyncio.gather(
+                *[
+                    asyncio.to_thread(cv2.imread,file_path)
+                    for file_path in target_files
+                ]
+            )
+        
+        results = await pipeline(images)
 
-        for batch_start in range(0, len(files), batch_size):
-            
-            print(f"Processing batch [{batch_start} : {batch_start + batch_size}]")
-            target_files = files[batch_start : batch_start + batch_size]
-            images = await asyncio.gather(
-                    *[
-                        asyncio.to_thread(cv2.imread,file_path)
-                        for file_path in target_files
-                    ]
-                )
-            
-            results = await pipeline(images)
-
-            await asyncio.gather(
-                    *[
-                        asyncio.to_thread(write_image,file_path,output_dir,result)
-                        for file_path,result in zip(target_files,results)
-                    ]
-                )
-            print("Done")
+        await asyncio.gather(
+                *[
+                    asyncio.to_thread(write_image,file_path,output_dir,result)
+                    for file_path,result in zip(target_files,results)
+                ]
+            )
+        print("Done")
             
 if __name__ == "__main__":
     asyncio.run(main())

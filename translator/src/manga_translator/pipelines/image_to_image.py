@@ -26,7 +26,8 @@ class TranslatableFrame:
         self.frame = frame
         self.detections = detections
         self.segments = segments
-         
+
+# TODO: Currently text that is not translated is still erased, might wan to change this in the future
 class ImageToImagePipeline(Pipeline):
     def __init__(self,detector: Detector = Detector(), segmenter: Segmenter = Segmenter(),translator: Translator = Translator(),cleaner: Cleaner = Cleaner,drawer: Drawer = Drawer(),ocr: OCR = OCR(),color_detector: ColorDetector = ColorDetector()):
         super().__init__()
@@ -101,6 +102,7 @@ class ImageToImagePipeline(Pipeline):
 
         translatable_frames: list[TranslatableFrame] = []
 
+        # translate only input with detections
         for i in range(len(input_images)):
             if len(detections[i]) == 0:
                 # print(f"Skipping {i}, no detections")
@@ -108,62 +110,64 @@ class ImageToImagePipeline(Pipeline):
 
             translatable_frames.append(TranslatableFrame(i,input_images[i],detections[i],segments[i]))
 
+        # if no detections no work
         if len(translatable_frames) == 0:
             return results
         
+        # prep for other plugins
         raw_translatable_frames = [item.frame for item in translatable_frames]
         detections = [item.detections for item in translatable_frames]
         segments = [item.segments for item in translatable_frames]
 
+        # produce segmentation masks that will be used for inpainting (Maybe we push this to the cleaner)
         # create 1d segmentation masks for inpainting
         masks = await asyncio.gather(*[asyncio.to_thread(self.make_mask,item.frame,item.segments)  for item in translatable_frames])
 
+        # Produce cleaned frames
         cleaned_frames = await self.cleaner(raw_translatable_frames,masks,segments,detections)
 
-        for i in range(len(cleaned_frames)):
-            results[translatable_frames[i].index] = cleaned_frames[i].copy()
+        # Removed because we only want to clean as much as we need to
+        # for i in range(len(cleaned_frames)):
+        #     results[translatable_frames[i].index] = cleaned_frames[i].copy()
 
+        # each detection is a section so this is a flat list of all detections (maybe we do some kind of grouping here to help paralelism) in the future
         sections = await self.extract_detected_sections_batched(raw_translatable_frames,cleaned_frames,masks,detections)
-
+        
+        # perform ocr on each detection
         ocr_results = await self.ocr([section.text for section in sections])
 
+        # no point in working on frames with no text detected
         valid_ocr_indices = [i for i in range(len(ocr_results)) if len(ocr_results[i].text.strip()) > 0]
         valid_ocr_indices_len = len(valid_ocr_indices)
 
-        sections_dirty = False
+        resize_sections = False
+
+        # Reduce ocr results to only valid ones
         if valid_ocr_indices_len != len(ocr_results):
             x = [ocr_results[i] for i in valid_ocr_indices]
             ocr_results = x
-            sections_dirty = True
+            resize_sections = True
 
+        # if no ocr we can't translate anything
         if valid_ocr_indices_len > 0:
             translation_results = await self.translator(ocr_results)
             
-            valid_translations_incides = [i for i in range(len(translation_results)) if len(translation_results[i].text.strip()) > 0]
-            valid_translations_incides_len = len(valid_translations_incides)
+            if resize_sections:
+                x = [sections[valid_ocr_indices[i]] for i in range(len(translation_results))]
+                sections = x
+                
+            drawn_results = await self.drawer([section.draw_section for section in sections],translation_results)
 
-            if valid_translations_incides_len != len(translation_results):
-                x = [translation_results[i] for i in valid_translations_incides]
-                translation_results = x
-                sections_dirty = True
+            frame_sections = [[] for _ in range(len(raw_translatable_frames))]
 
-            if valid_translations_incides_len > 0:
-                if sections_dirty:
-                    x = [sections[valid_ocr_indices[valid_translations_incides[i]]] for i in valid_translations_incides]
-                    sections = x
-                    
-                drawn_results = await self.drawer([section.draw_section for section in sections],translation_results)
+            for section,drawn_result in zip(sections,drawn_results):
+                frame_sections[section.source_index].append((section,*drawn_result))
 
-                frame_sections = [[] for _ in range(len(raw_translatable_frames))]
+            
+            await asyncio.gather(*[asyncio.to_thread(self.composite_drawn_sections,cleaned_frames[i],frame_sections[i]) for i in range(len(raw_translatable_frames))])
 
-                for section,drawn_result in zip(sections,drawn_results):
-                    frame_sections[section.source_index].append((section,*drawn_result))
-
-
-                await asyncio.gather(*[asyncio.to_thread(self.composite_drawn_sections,cleaned_frames[i],frame_sections[i]) for i in range(len(raw_translatable_frames))])
-
-                for item,result_frame in zip(translatable_frames,cleaned_frames):
-                    results[item.index] = result_frame
+            for item,result_frame in zip(translatable_frames,cleaned_frames):
+                results[item.index] = result_frame
 
         # for x in to_translate:
         #     segments_list = list(map(lambda a: a.points,x.segments))
