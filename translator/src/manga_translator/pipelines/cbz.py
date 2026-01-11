@@ -6,8 +6,6 @@ import tempfile
 import numpy as np
 import asyncio
 import cv2
-import traceback
-from typing import Union
 from manga_translator.core.plugin import Cleaner, Drawer, OCR, Translator
 from manga_translator.drawing.horizontal import HorizontalDrawer
 from manga_translator.core.pipeline import Pipeline

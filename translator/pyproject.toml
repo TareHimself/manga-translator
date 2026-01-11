@@ -12,6 +12,7 @@ dependencies = [
     "hf-xet>=1.2.0",
     "jaconv>=0.4.1",
     "largestinteriorrectangle>=0.2.1",
+    "more-itertools>=10.8.0",
     "numba==0.63.1",
     "numpy>=2.3.5",
     "openai==2.14.0",

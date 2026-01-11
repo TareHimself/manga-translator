@@ -3,7 +3,7 @@ from manga_translator.core.plugin import PluginArgument, PytorchDevicePluginSele
 from ultralytics import YOLO
 import torch
 import asyncio
-from manga_translator.utils import get_default_torch_device
+from manga_translator.utils import get_default_torch_device,perf_async
 
 
 class YoloSegmenter(Segmenter):
@@ -16,7 +16,8 @@ class YoloSegmenter(Segmenter):
     def predict(self,batch):
         with torch.inference_mode():
             return self.model.predict(batch,device = self.device, verbose=False)
-        
+    
+    @perf_async
     async def segment(self, batch):
         with torch.inference_mode():
             results = []

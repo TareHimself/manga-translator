@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 import cv2
 import numpy as np
 from PIL import ImageFont, ImageDraw
@@ -6,14 +6,14 @@ from numpy import ndarray
 import pyphen
 import asyncio
 from manga_translator.core.plugin import (
+    ColorDetectionResult,
     Drawer,
     StringPluginArgument,
     PluginArgument,
     IntPluginArgument,
     TranslatorResult,
 )
-from typing import Union
-from manga_translator.utils import find_best_font_size, cv2_to_pil, pil_to_cv2, ensure_gray
+from manga_translator.utils import find_best_font_size, cv2_to_pil, pil_to_cv2, ensure_gray,perf_async
 
 
 class HorizontalDrawer(Drawer):
@@ -25,7 +25,7 @@ class HorizontalDrawer(Drawer):
         max_font_size=20,
         min_font_size=5,
         line_spacing=2,
-        hyphenator: Union[pyphen.Pyphen, None] = pyphen.Pyphen(lang="en"),
+        hyphenator: Optional[pyphen.Pyphen] = pyphen.Pyphen(lang="en"),
         margin=3,
     ) -> None:
         super().__init__()
@@ -37,7 +37,7 @@ class HorizontalDrawer(Drawer):
         self.margin = margin
 
     # TODO make this whole function better
-    def draw_text(self, frame: np.ndarray, translation: TranslatorResult):
+    def draw_text(self, frame: np.ndarray, translation: TranslatorResult,color: ColorDetectionResult):
 
         frame_h, frame_w = frame.shape[:2]
 
@@ -53,7 +53,7 @@ class HorizontalDrawer(Drawer):
             20,
             max_font_size=self.max_font_size,
             min_font_size=self.min_font_size,
-            line_spacing=self.line_spacing,
+            line_spacing=self.line_spacing + (color.outline_size * 2),
             hyphenator=self.hyphenator
         )
 
@@ -74,14 +74,10 @@ class HorizontalDrawer(Drawer):
         pen_mask = ImageDraw.Draw(as_pil_mask)
 
         font = ImageFont.truetype(self.font_file, size=fit_result.font_size)
-
-        outline_width = 1
-
         text_bounds = np.array(fit_result.wrap.bounds)
         available_space_y = frame_h
         centering_offset_y = (available_space_y - text_bounds[1]) / 2
         
-
         for i in range(len(fit_result.wrap.lines)):
             line = fit_result.wrap.lines[i]
 
@@ -104,33 +100,34 @@ class HorizontalDrawer(Drawer):
                     y_pos,
                 ),
                 str(text),
-                fill=(0, 0, 0, 255),
+                fill=(*color.text_color, 255),
                 font=font,
-                stroke_width=outline_width,
-                stroke_fill=(255,255,255,255) if outline_width > 0 else None
+                stroke_width=color.outline_size,
+                stroke_fill=(*color.outline_color,255) if color.outline_size > 0 else None
             )
-
+            
+            # text mask for compositing
             pen_mask.text(
                 (
                     x_pos,
                     y_pos,
                 ),
                 str(text),
-                fill=(255, 255, 255, 255),
+                fill=(255,255,255, 255),
                 font=font,
-                stroke_width=outline_width,
-                stroke_fill=(255, 255, 255, 255),
+                stroke_width=color.outline_size + 1,
+                stroke_fill=(255,255,255, 255),
             )
 
         return pil_to_cv2(as_pil),ensure_gray(pil_to_cv2(as_pil_mask))
-
+    @perf_async
     async def draw(
-        self, frames: list[np.ndarray], translations: list[TranslatorResult]
+        self, frames: list[np.ndarray], translations: list[TranslatorResult],colors: list[ColorDetectionResult]
     ) -> list[np.ndarray]:
         return await asyncio.gather(
             *[
-                asyncio.to_thread(self.draw_text, frame, translation)
-                for frame, translation in zip(frames, translations)
+                asyncio.to_thread(self.draw_text, frame, translation,color)
+                for frame, translation,color in zip(frames, translations,colors)
             ]
         )
 

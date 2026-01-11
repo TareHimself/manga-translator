@@ -14,7 +14,7 @@ import cv2
 import asyncio
 import torch
 import torch.nn.functional as F
-from manga_translator.utils import get_default_torch_device
+from manga_translator.utils import get_default_torch_device, perf_async
 import torchvision.transforms.v2 as T
 
 
@@ -116,7 +116,7 @@ class LamaCleaner(Cleaner):
                 )
 
         return patches
-
+    
     def clean_patches(self, patches: list[_LamaImagePatch]):
         with torch.inference_mode():
             # we can do some kind of size based grouping to batch here
@@ -163,6 +163,7 @@ class LamaCleaner(Cleaner):
         return results
 
     # might be a better way to do this since areas that may be clipped by detections are still inpainted
+    @perf_async
     async def clean(
         self,
         frames: list[np.ndarray],

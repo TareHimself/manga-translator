@@ -1,8 +1,11 @@
-import type { FetchImageResponse } from "../../shared/types";
+import type { SerializedImage } from "../../shared/types";
 import { SourceTags } from "./SourceTags";
 import type { ISource } from "./types";
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Picture element
+ */
 export class PictureSource implements ISource {
     source: HTMLPictureElement
     id: string
@@ -28,7 +31,7 @@ export class PictureSource implements ISource {
     getId(): string {
         return this.id
     }
-    getImageInfo(): FetchImageResponse {
+    getImageInfo(): SerializedImage {
         return {
             url: this.sourceImage.src,
             id: this.id,
@@ -68,3 +71,4 @@ export class PictureSource implements ISource {
         this.source.toggleAttribute(SourceTags.PendingTranslation,true)
     }
 }
+

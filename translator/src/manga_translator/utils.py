@@ -1,31 +1,31 @@
+import colorsys
 from itertools import chain
 import cv2
 import torch
 import numpy as np
 import pyphen
 import pycountry
-from typing import Union, TypeVar
+from typing import Optional, TypeVar, Callable, Awaitable, TypeVar
 import largestinteriorrectangle as lir
 from PIL import Image, ImageFont
-from manga_translator.core.typing import Vector4i
+from manga_translator.core.typing import Vector4i,Vector3u8
+import asyncio
+import time
+import functools
 T = TypeVar("T")
 R = TypeVar("R")
 
 
-# async def run_in_thread(func, *args, **kwargs):
-#     loop = asyncio.get_event_loop()
-#     task = asyncio.Future()
-
-#     def run():
-#         nonlocal loop
-#         nonlocal func
-#         nonlocal task
-
-#         result = func(*args, **kwargs)
-
-#         if inspect.isawaitable(result):
-#             result = asyncio.run(result)
-#         loop.call_soon_threadsafe(task.set_result, result)
+def perf_async(fn) -> Callable[T, Awaitable[R]]:
+    label = fn.__qualname__
+    async def wrapper(*args, **kwargs) -> R:
+        start = time.perf_counter()
+        try:
+            return await fn(*args, **kwargs)
+        finally:
+            elapsed = time.perf_counter() - start
+            print(f"{label} took {elapsed:.6f}s")
+    return wrapper
 
 #     task_thread = threading.Thread(group=None, daemon=True, target=run)
 #     task_thread.start()
@@ -134,7 +134,7 @@ def has_white(image: np.ndarray):
 
 def wrap_text_pure(
     text: str, font: ImageFont.FreeTypeFont,line_spacing: float = 2, wrap_width: float = float("inf")
-) -> Union[WrapResult, None]:
+) -> Optional[WrapResult]:
     layout_cache = LayoutCache(font=font)
     _, _, space_width, _ = layout_cache.get(" ")
     text_list = text.split()
@@ -183,7 +183,7 @@ def wrap_text_with_hyphenator(
     hyphenator: pyphen.Pyphen,
     wrap_width: float = float("inf"),
     line_spacing: float = 2,
-) -> Union[WrapResult, None]:
+) -> Optional[WrapResult]:
     layout_cache = LayoutCache(font=font)
     hyphenation_cache = HyphenationCache(
         hyphenator=hyphenator, layout_cache=layout_cache, wrap=wrap_width
@@ -272,9 +272,9 @@ def wrap_text(
     text: str,
     font: ImageFont.FreeTypeFont,
     wrap_width: float = float("inf"),
-    hyphenator: Union[pyphen.Pyphen, None] = None,
+    hyphenator: Optional[pyphen.Pyphen] = None,
     line_spacing: float = 2
-) -> Union[WrapResult, None]:
+) -> Optional[WrapResult]:
     return (
         wrap_text_pure(text, font, wrap_width,line_spacing)
         if hyphenator is None
@@ -301,8 +301,8 @@ def find_best_font_size(
     max_font_size=20,
     tolerance=1,
     line_spacing: float = 2,
-    hyphenator: Union[pyphen.Pyphen, None] = None,
-) -> Union[FontFitResult, None]:
+    hyphenator: Optional[pyphen.Pyphen] = None,
+) -> Optional[FontFitResult]:
     current_size = min(font_size, max_font_size)
     current_max = max_font_size
     current_min = min_font_size
@@ -351,7 +351,7 @@ def ensure_gray(img: np.ndarray) -> np.ndarray:
         return cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
     return img.copy()
 
-def draw_area_bbox(section: np.ndarray) -> Vector4i:
+def compute_draw_bbox(section: np.ndarray) -> Vector4i:
     grey = ensure_gray(section)
 
     height,width = grey.shape[:2]
@@ -379,7 +379,7 @@ def draw_area_bbox(section: np.ndarray) -> Vector4i:
     return np.array([p1x,p1y,p2x,p2y],dtype=np.int32)
 
 
-def simplify_lang_code(code: str) -> Union[str, None]:
+def simplify_lang_code(code: str) -> Optional[str]:
     try:
         lang = pycountry.languages.lookup(code)
 
@@ -421,7 +421,7 @@ def get_available_pytorch_devices() -> list[tuple[str,str]]:
     return results
     
 
-def lang_code_to_name(code: str) -> Union[str, None]:
+def lang_code_to_name(code: str) -> Optional[str]:
     try:
         return pycountry.languages.lookup(code).name
     except:
@@ -435,3 +435,22 @@ def get_default_torch_device():
         return torch.device("mps")
     
     return torch.device("cpu")
+
+def inverse_luminance_color(rgb: np.ndarray) -> Vector3u8:
+    """
+    Return a color with inverted perceived brightness (same hue/saturation).
+    Expects `rgb` as np.ndarray of shape (3,) and dtype uint8 in RGB order.
+    """
+    if rgb.dtype != np.uint8 or rgb.shape != (3,):
+        raise ValueError("rgb must be a 1D np.uint8 array of shape (3,) in RGB order")
+
+    # Normalize to [0,1]
+    r, g, b = rgb.astype(np.float32) / 255.0
+
+    # Convert to HLS, invert lightness
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    l = 1.0 - l
+
+    # Back to RGB
+    r2, g2, b2 = colorsys.hls_to_rgb(h, l, s)
+    return np.array([int(round(x * 255)) for x in (r2, g2, b2)],dtype=np.uint8)

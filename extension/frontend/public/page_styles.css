@@ -12,6 +12,6 @@
   }
 }
 
-img[data-manga-translator-translating] {
+[data-manga-translator-translating] {
   animation: 1s infinite linear load_pending;
 }

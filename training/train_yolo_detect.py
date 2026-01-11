@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class Config:
     output: str = os.path.join(".","trained_detect.pt") # Trained model output path
     dataset: str # Path to the dataset 'data.yaml'
-    checkpoint: str = './yolo11m-detect.pt' # The checkpoint to start training from
+    checkpoint: str = 'yolo11s.yaml' # The checkpoint to start training from
     device: str = 'cuda:0' # pytorch device to train with
     
 if __name__ == '__main__':

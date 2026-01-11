@@ -13,14 +13,16 @@
   "permissions": [
     "contextMenus",
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage",
+    "webRequest"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "icons": {
-   "128": "extension_icon128.png"
- },
+    "128": "extension_icon128.png"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -29,7 +31,19 @@
       "js": [
         "content.js"
       ],
-      "css": ["page_styles.css"]
+      "css": [
+        "page_styles.css"
+      ]
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
     }
   ]
 }

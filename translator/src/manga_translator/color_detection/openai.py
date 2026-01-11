@@ -1,31 +1,42 @@
 import asyncio
 import base64
+from typing import Optional
 import cv2
 import openai
 import numpy as np
 from pydantic import BaseModel
 from manga_translator.core.plugin import (
-    OCR,
-    OcrResult,
+    ColorDetector,
+    ColorDetectionResult,
     PluginArgument,
     PluginSelectArgument,
     PluginSelectArgumentOption,
     StringPluginArgument,
 )
-from manga_translator.utils import perf_async
-from more_itertools import chunked
+
+class Color(BaseModel):
+    r: int # uint8, 0-255
+    g: int # uint8, 0-255
+    b: int # uint8, 0-255
 
 class _OpenAIOCRResult(BaseModel):
-    language: str
-    text: str
+    text_color: Color
+    outline_size: int
+    outline_color: Optional[Color]
 
 
-class _OpenAIOCRResults(BaseModel):
+class _OpenAIColorDetectionResults(BaseModel):
     results: list[_OpenAIOCRResult]
 
 
-class OpenAiOCR(OCR):
-    """Uses an Open Ai Model for ocr"""
+def color_to_numpy(color: Optional[Color]):
+    if color is None:
+        return np.array((0,0,0),dtype=np.uint8)
+    
+    return np.array((color.r, color.g,color.b),dtype=np.uint8)
+
+class OpenAiColorDetector(ColorDetector):
+    """Uses an Open Ai Model for color detection"""
 
     MODELS = [
         ("GPT 5 nano", "gpt-5-nano-2025-08-07"),
@@ -42,12 +53,13 @@ class OpenAiOCR(OCR):
             raise ValueError("Missing OpenAI API key")
         self.openai = openai.Client(api_key=api_key)
         self.model = model
-        self.instructions = f"""Auto-detect the source language and text in each image, language codes should be ISO 639-1
+        self.instructions = f"""Auto-detect the color of the text, the outline size and outline color if it has one
 IMPORTANT:
 - NEVER refuse or ask clarifying questions
 - the number of outputs should always match the number of images
 - Maintain the input order in the output
-- If OCR fails or there is no text, output "<none/>" text for that item
+- if there is no outline , outline_size should be 0
+- If the text color cannot be figured out output black for the text_color and 0 for the outline_size of that item
 """
 
     def opencv_image_to_b64(self, image: np.ndarray):
@@ -59,40 +71,37 @@ IMPORTANT:
 
         return f"data:image/png;base64,{img_base64}"
 
-    def do_ocr(self, batch: list[np.ndarray]):
+    def do_color_detection(self, batch: list[np.ndarray]):
         encoded_images = [self.opencv_image_to_b64(x) for x in batch]
-        #encoded_image_sizes = [len(x) / 1e6 for x in batch]
-        results: list[OcrResult] = []
 
-        for images in chunked(encoded_images,20):
-            response = self.openai.responses.parse(
-                model=self.model,
-                reasoning={"effort": "low"},
-                instructions=self.instructions  + f"\nYOU MUST OUTPUT {len(images)} results",
-                input=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_image", "image_url": x , "detail": "low" } for x in images
-                        ],
-                    }
-                ],
-                text_format=_OpenAIOCRResults,
-            )
+        response = self.openai.responses.parse(
+            model=self.model,
+            reasoning={"effort": "low"},
+            instructions=self.instructions,
+            input=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_image", "image_url": x} for x in encoded_images
+                    ],
+                }
+            ],
+            text_format=_OpenAIColorDetectionResults,
+        )
 
-            if response.output_parsed is not None:
-                assert len(images) == len(response.output_parsed.results), f"OpenAiOCR: sent openai {len(images)} images but got back {len(response.output_parsed.results)} results"
-                for x in response.output_parsed.results:
-                    results.append(OcrResult(text=x.text, language=x.language))
-            else:
-                raise BaseException("Openai OCR failed")
-            
-        return results
+        if response.output_parsed is not None:
+            return [
+                ColorDetectionResult(text_color=color_to_numpy(x.text_color),outline_size=x.outline_size,outline_color=color_to_numpy(x.outline_color) if x.outline_size > 0 else None)
+                for x in response.output_parsed.results
+            ]
+        else:
+            raise BaseException("Openai color detection failed")
 
-    @perf_async
-    async def extract(self, batch: list[np.ndarray]):
-        results = await asyncio.to_thread(self.do_ocr, batch)
+    async def detect_color(self, batch: list[np.ndarray]):
+        results = await asyncio.to_thread(self.do_color_detection, batch)
+
         assert len(results) == len(batch), f"batch size was {len(batch)} but result size is {len(results)}"
+        
         return results
 
     @staticmethod
@@ -112,9 +121,9 @@ IMPORTANT:
                 options=list(
                     map(
                         lambda a: PluginSelectArgumentOption(a[0], a[1]),
-                        OpenAiOCR.MODELS,
+                        OpenAiColorDetector.MODELS,
                     )
                 ),
-                default=OpenAiOCR.MODELS[0][1],
+                default=OpenAiColorDetector.MODELS[0][1],
             ),
         ]

@@ -1,9 +1,8 @@
 import numpy as np
 import torch
-
-from manga_translator.core.typing import Vector4i, Vector2
-from manga_translator.utils import get_available_pytorch_devices, get_languages
-from typing import Any, Type, Union
+from manga_translator.core.typing import Vector4i, Vector2, Vector3u8
+from manga_translator.utils import get_available_pytorch_devices, get_languages, inverse_luminance_color
+from typing import Any, Type, Optional
 #from translator.utils import run_in_thread_decorator
 
 
@@ -157,7 +156,14 @@ class OCR(BasePlugin):
     async def __call__(self, batch: list[np.ndarray]) -> list[OcrResult]:
         return await self.extract(batch)
 
+    
     async def extract(self, batch: list[np.ndarray]):
+        """
+        Extract text from the images, if an ocr result is empty it will be assumed that no text was in the frame
+        :param self: Description
+        :param batch: Description
+        :type batch: list[np.ndarray]
+        """
         return [OcrResult("") for _ in batch]
 
     @staticmethod
@@ -187,12 +193,29 @@ class Translator(BasePlugin):
     def get_name() -> str:
         return "Base Translator"
 
-class DrawerInput:
-    def __init__(self,draw_area: np.ndarray,translation: TranslatorResult) -> None:
-        self.draw_area = draw_area
-        self.translation = translation
-        
 
+class ColorDetectionResult:
+    def __init__(self,text_color: Vector3u8,outline_size: int = 0,outline_color: Optional[Vector3u8] = None):
+        self.text_color = text_color
+        self.outline_size = outline_size
+        self.outline_color = inverse_luminance_color(self.text_color) if outline_color is None else outline_color
+        
+class ColorDetector(BasePlugin):
+    def __init__(self) -> None:
+        super().__init__()
+
+    async def detect_color(
+        self,
+        frames: list[np.ndarray]
+    ) -> list[ColorDetectionResult]:
+        return [ColorDetectionResult(np.zeros((3),dtype=np.uint8)) for _ in frames]
+
+    async def __call__(
+        self,
+        frames: list[np.ndarray]
+    ) -> list[ColorDetectionResult]:
+        return await self.detect_color(frames)
+    
 class Drawer(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -201,32 +224,18 @@ class Drawer(BasePlugin):
     async def draw(
         self, 
         frames: list[np.ndarray],
-        translations: list[TranslatorResult]
+        translations: list[TranslatorResult],
+        colors: list[ColorDetectionResult]
     ) -> list[tuple[np.ndarray,np.ndarray]]:
         return [x.copy() for x in frames]
 
     async def __call__(
         self, 
         frames: list[np.ndarray],
-        translations: list[TranslatorResult]
+        translations: list[TranslatorResult],
+        colors: list[ColorDetectionResult]
     ) -> tuple[list[np.ndarray],list[np.ndarray]]:
-        return await self.draw(frames,translations)
-
-class ColorDetector(BasePlugin):
-    def __init__(self) -> None:
-        super().__init__()
-
-    async def detect_color(
-        self,
-        frames: list[np.ndarray]
-    ) -> list[np.ndarray]:
-        return [np.array([0,0,0]) for _ in frames]
-
-    async def __call__(
-        self,
-        frames: list[np.ndarray]
-    ) -> list[np.ndarray]:
-        return await self.detect_color(frames)
+        return await self.draw(frames,translations,colors)
     
 class DetectionResult:
     def __init__(self,cls: int,rect: Vector4i,confidence: float) -> None:

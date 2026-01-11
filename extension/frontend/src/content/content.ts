@@ -1,20 +1,25 @@
 import browser from "webextension-polyfill"
-import { type Message, type FetchOrRestoreImageMessage as FetchOrRestoreImageMessage, type FetchImageResponse, type CompletedTranslationMessage, type StartedTranslationMessage, type FailedTranslationMessage, MessageType } from "../shared/types"
-import { getContextMenuSourceTarget, getSourceById, SourceTags } from "./sources";
+import { type Message, type FetchOrRestoreImageMessage as FetchOrRestoreImageMessage, type SerializedImage, type CompletedTranslationMessage, type StartedTranslationMessage, type FailedTranslationMessage, MessageType } from "../shared/types"
+import { getContextMenuSourceTarget, getSourceById, getTargetElement, SourceTags } from "./sources";
+import { makeError, makeResponse } from "../shared/response";
 
 
+const fetchOrRestoreImage: (...args: FetchOrRestoreImageMessage["args"]) => SerializedImage[] | undefined = () => {
+    const sources = getContextMenuSourceTarget()
 
-const fetchOrRestoreImage: (...args: FetchOrRestoreImageMessage["args"]) => FetchImageResponse | undefined = () => {
-    const source = getContextMenuSourceTarget()
+    if (sources === undefined){
+        throw  { 
+            error: "element not supported for translation",
+            element: getTargetElement()?.outerHTML
+        }
+    }
 
-    if (source === undefined) return
-
-    if(source.hasTranslation()){
-        source.toggleTranslationVisible()
+    if (sources[0].hasTranslation()) {
+        sources[0].toggleTranslationVisible()
         return undefined
     }
 
-    return source.getImageInfo()
+    return sources.filter(c => !c.hasTranslation()).map(c => c.getImageInfo())
 }
 
 const onTranslationStarted: (...args: StartedTranslationMessage["args"]) => void = (imageId) => {
@@ -49,30 +54,39 @@ browser.runtime.onMessage.addListener((data, _, respond) => {
         case MessageType.FetchOrRestoreImage:
             {
                 try {
-                    respond(fetchOrRestoreImage(...message.args))
+                    respond(makeResponse(fetchOrRestoreImage(...message.args)))
                 }
-                catch{
-                    respond(undefined)
+                catch(e) {
+                    respond(makeError(e))
                 }
             }
             break;
         case MessageType.TranslationStarted:
             {
-                respond(undefined)
+                respond(makeResponse(undefined))
                 onTranslationStarted(...message.args)
             }
             break;
         case MessageType.TranslationComplete:
             {
-                respond(undefined)
+                respond(makeResponse(undefined))
                 onTranslationCompleted(...message.args)
             }
             break;
         case MessageType.TranslationFailed:
             {
-                respond(undefined)
+                respond(makeResponse(undefined))
                 onTranslationFailed(...message.args)
             }
+            break;
+        case MessageType.InspectMessage:
+            {
+                respond(makeResponse({
+                    html: document.documentElement.innerHTML,
+                    element: getTargetElement()?.outerHTML ?? ""
+                }))
+            }
+            break;
     }
 
     return true;

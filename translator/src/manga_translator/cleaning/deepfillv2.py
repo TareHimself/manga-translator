@@ -48,7 +48,7 @@ class DeepFillV2Cleaner(Cleaner):
     ) -> None:
         super().__init__()
         self.device = device
-        self.model = torch.jit.load(model_path, map_location=device)
+        self.model = torch.jit.freeze(torch.jit.load(model_path, map_location=device).eval())
         self.inpaint_patches = inpaint_patches
         self.patch_padding = np.array([patch_padding, patch_padding], dtype=np.int32)
         self.zero_max = np.zeros((2), dtype=np.int32)

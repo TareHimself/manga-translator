@@ -3,32 +3,33 @@ import { SourceTags } from "./SourceTags";
 import type { ISource } from "./types";
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Regular images
- */
-export class ImageSource implements ISource {
-    source: HTMLImageElement
+function loadAsync(src: string) {
+    return new Promise<HTMLImageElement>((res, rej) => {
+        const img = new Image()
+        img.onload = () => {
+            res(img)
+        }
+        img.onerror = rej
+        img.src = src
+    })
+}
+export class CanvasSource implements ISource {
+    source: HTMLCanvasElement
     id: string
-    constructor(source: HTMLImageElement) {
+    constructor(source: HTMLCanvasElement) {
         this.source = source
         this.id = this.source.getAttribute(SourceTags.Id) ?? uuidv4()
         this.source.setAttribute(SourceTags.Id, this.id)
-        this.source.setAttribute(SourceTags.OriginalSrc, this.getInitialSrc())
-    }
-    getInitialSrc() {
-        return this.source.src
+        this.source.setAttribute(SourceTags.OriginalSrc, source.toDataURL())
     }
 
-    updateSrc(src: string) {
-        this.source.src = src
-    }
     getId(): string {
         return this.id
     }
     getImageInfo(): SerializedImage {
 
         return {
-            url: this.source.getAttribute(SourceTags.OriginalSrc) ?? this.getInitialSrc(),
+            url: this.source.getAttribute(SourceTags.OriginalSrc) ?? "",
             id: this.id,
             headers: {
                 referer: window.location.origin,
@@ -42,22 +43,30 @@ export class ImageSource implements ISource {
     isShowingTranslation(): boolean {
         return this.source.hasAttribute(SourceTags.TranslationVisible)
     }
-    toggleTranslationVisible() {
+    async toggleTranslationVisible() {
         if (this.hasTranslation()) {
             if (this.isShowingTranslation()) {
-                this.updateSrc(this.source.getAttribute(SourceTags.OriginalSrc) ?? "")
+                const img = await loadAsync(this.source.getAttribute(SourceTags.OriginalSrc) ?? "")
+                this.source.getContext('2d')?.drawImage(img, 0, 0)
                 this.source.toggleAttribute(SourceTags.TranslationVisible, false)
             }
             else {
-                this.updateSrc(this.source.getAttribute(SourceTags.TranslatedSrc) ?? "")
+                const img = await loadAsync(this.source.getAttribute(SourceTags.TranslatedSrc) ?? "")
+                this.source.getContext('2d')?.drawImage(img, 0, 0)
                 this.source.toggleAttribute(SourceTags.TranslationVisible, true)
             }
         }
     }
-    onTranslationCompleted(url: string) {
+
+    async onTranslationCompleted(url: string) {
         this.source.setAttribute(SourceTags.TranslatedSrc, url)
-        this.toggleTranslationVisible()
-        this.source.toggleAttribute(SourceTags.PendingTranslation, false)
+        this.toggleTranslationVisible().then(() => {
+            this.source.toggleAttribute(SourceTags.PendingTranslation, false)
+        }).catch((e) => {
+            console.error(e)
+            this.source.toggleAttribute(SourceTags.PendingTranslation, false)
+        })
+        
     }
     onTranslationFailed() {
         this.source.toggleAttribute(SourceTags.PendingTranslation, false)

@@ -6,10 +6,11 @@ from manga_translator.segmentation.get import get_segmenters
 from manga_translator.translation.get import get_translators
 from manga_translator.ocr.get import get_ocrs
 from manga_translator.drawing.get import get_drawers
+from manga_translator.color_detection.get import get_color_detectors
 from manga_translator.pipelines.image_to_image import ImageToImagePipeline
 import yaml
 
-_classes: list[Type[BasePlugin]] = [*get_cleaners(),*get_detectors(),*get_segmenters(),*get_translators(),*get_ocrs(),*get_drawers()]
+_classes: list[Type[BasePlugin]] = [*get_cleaners(),*get_detectors(),*get_segmenters(),*get_translators(),*get_ocrs(),*get_drawers(),*get_color_detectors()]
 _classes_dict = {}
 for x in _classes:
     _classes_dict[x.__name__] = x

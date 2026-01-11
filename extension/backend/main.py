@@ -5,20 +5,19 @@ import asyncio
 from manga_translator.utils import pil_to_cv2
 from manga_translator.utils import get_default_torch_device
 from manga_translator.get import construct_image_to_image_pipeline_from_config
-from PIL import Image
+import traceback
 import os
 import hashlib
-from blacksheep import Application, Content, FromFiles, Request, Response, file, get, post, ContentDispositionType
+from blacksheep import Application, Content, FromFiles, Request, Response, file, get, post, ContentDispositionType, json, bad_request
 from blacksheep.client import ClientSession
 import numpy as np
-
 
 print("Using pytorch device",get_default_torch_device())
 default_component = {"id": 0, "args": {}}
 APP_PORT = 9000
 TRANSLATED_IMAGES_PATH = os.path.abspath(os.path.join(".",".temp", "translated"))
 CONFIG_PATH = os.path.abspath(os.path.join(".","config.yaml"))
-PUBLIC_SERVER_ADDRESS = os.environ.get("PUBLIC_SERVER_ADDRESS", f"http://127.0.0.1:{APP_PORT}")
+PUBLIC_SERVER_ADDRESS = os.environ.get("PUBLIC_SERVER_ADDRESS", f"http://10.0.0.107:{APP_PORT}")#f"http://127.0.0.1:{APP_PORT}")
 pipeline = construct_image_to_image_pipeline_from_config(config_path=CONFIG_PATH)
 os.makedirs(TRANSLATED_IMAGES_PATH, exist_ok=True)
 
@@ -26,6 +25,13 @@ PENDING_TRANSLATION_JOBS: dict[str,asyncio.Future] = {}
 
 app = Application()
 lock = asyncio.Lock()
+
+app.use_cors(
+    allow_methods="*",
+    allow_origins="*",
+    allow_headers="* Authorization",
+    max_age=300,
+)
 
 # I cant figure out how to send requests these requests from the extension
 @post("/api/v1/get-image")
@@ -46,51 +52,86 @@ async def fetch_image(request: Request):
         return resp
     
 
+def compute_hash(data):
+    return hashlib.sha256(data).hexdigest()
+
+def bytes_to_mat(data: bytes):
+    array = np.asarray(bytearray(data), dtype=np.uint8)
+    return cv2.imdecode(array,cv2.IMREAD_COLOR_BGR)
+
+def save_translated(file_path: str,data: np.ndarray):
+    cv2.imwrite(file_path,data)
+
+def make_translated_url(key):
+    return f"{PUBLIC_SERVER_ADDRESS}/api/v1/translated/{key}.png"
+
 @post("/api/v1/translate")
 async def translate_images(files: FromFiles):
-    images = files.value
+    try:
+        images = files.value
 
-    if len(images) == 0:
-        raise BaseException("No Image Sent")
-    
-    image = images[0]
+        if len(images) == 0:
+            return bad_request("No Images Sent")
+        
+        
+        keys = await asyncio.gather(*[asyncio.to_thread(
+            compute_hash,image.data
+        ) for image in images])
 
-    byte_hash = await asyncio.to_thread(
-        hashlib.sha256,image.data
-    )
+        
+        file_names = [f"{key}.png" for key in keys]
+        file_paths = [os.path.join(TRANSLATED_IMAGES_PATH, file_name) for file_name in file_names]
+        files_exist = await asyncio.gather(*[asyncio.to_thread(os.path.exists, file_path) for file_path in file_paths])
 
-    key = byte_hash.hexdigest()
-    dest_filename = f"{key}.png"
-    dest_file = os.path.join(TRANSLATED_IMAGES_PATH, dest_filename)
-    
-    if not await asyncio.to_thread(os.path.exists, dest_file):
-        pending = None
-        is_leader = False
-        async with lock:
-            pending = PENDING_TRANSLATION_JOBS.get(key,None)
-            if pending is None:
-                is_leader = True
-                pending = asyncio.get_running_loop().create_future()
-                PENDING_TRANSLATION_JOBS[key] = pending
+        to_translate_indices = [i for i in range(len(files_exist)) if not files_exist[i]]
 
-        if is_leader:
-                try:
-                    array = np.asarray(bytearray(image.data), dtype=np.uint8)
-                    image_cv2 = cv2.imdecode(array,cv2.IMREAD_COLOR_BGR)
-                    results = await pipeline(
-                        [image_cv2]
-                    )  # TODO: Maybe add some kind of batching here
+        loop = asyncio.get_running_loop()
 
-                    await asyncio.to_thread(cv2.imwrite, dest_file, results[0])
-                    PENDING_TRANSLATION_JOBS[key].set_result()
-                except Exception as e:
-                    PENDING_TRANSLATION_JOBS[key].set_exception(e)
-                finally:
-                    PENDING_TRANSLATION_JOBS.pop(key)
-        else:
-            await pending
-    
-    return Response(200,None,Content(b"text/plain",f"{PUBLIC_SERVER_ADDRESS}/api/v1/translated/{dest_filename}".encode()))
+        results: list[asyncio.Future] = [loop.create_future() for _ in keys]
+
+        for i in range(len(files_exist)):
+            if files_exist[i]:
+                results[i].set_result(make_translated_url(keys[i]))
+
+        if to_translate_indices:
+            translation_jobs: list[tuple[int,str,bytes,asyncio.Future]] = []
+            async with lock:
+                for i in to_translate_indices:
+                    key = keys[i]
+                    job = PENDING_TRANSLATION_JOBS.get(key,None)
+                    if job is None:
+                        job = results[i]
+                        PENDING_TRANSLATION_JOBS[key] = job
+                        translation_jobs.append((i,key,images[i].data,job))
+                    else:
+                        results[i] = job
+
+            if len(translation_jobs) > 0:
+                    try:
+                        batch = await asyncio.gather(*[asyncio.to_thread(bytes_to_mat,data) for _,_,data,_ in translation_jobs])
+
+                        translated_batch = await pipeline(batch)
+
+                        await asyncio.gather(*[asyncio.to_thread(save_translated,file_paths[info[0]],result) for info,result in zip(translation_jobs,translated_batch)])
+                        async with lock:
+                            for _,key,_,pending in translation_jobs:
+                                pending.set_result(make_translated_url(key))
+                                PENDING_TRANSLATION_JOBS.pop(key)
+                    except Exception as e:
+                        async with lock:
+                            for _,key,_,pending in translation_jobs:
+                                pending.set_exception(e)
+                                PENDING_TRANSLATION_JOBS.pop(key)
+                        raise
+            
+        urls = await asyncio.gather(*results)
+        
+        return json({
+            "urls": urls
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return Response(500,content=Content(b"text/plain",traceback.format_exc().encode()))
 
 @get("/api/v1/translated/{key}")
 async def get_translated_image(key: str):

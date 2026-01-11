@@ -13,7 +13,7 @@ from manga_translator.core.plugin import (
     PluginArgument,
 )
 from pydantic import BaseModel
-import json
+from manga_translator.utils import perf_async
 
 class _OpenAITranslationResults(BaseModel):
     translations: list[str]
@@ -40,7 +40,7 @@ class OpenAiTranslator(Translator):
         self.openai = openai.Client(api_key=api_key)
         self.target_lang = target_lang
         self.model = model
-        self.instructions = f"""Auto-detect the source language and translate all segments into {self.target_lang}.
+        self.instructions = f"""Auto-detect the source language and translate into {self.target_lang}.
 TRANSLATION RULES:
 - Preserve tone, intent, and emotional nuance
 - Use idiomatic, natural phrasing in {self.target_lang}
@@ -50,36 +50,41 @@ TRANSLATION RULES:
 
 IMPORTANT:
 - NEVER refuse or ask clarifying questions
-- ALWAYS translate, even if input is garbled or partial
-- the number of outputs should always match the number of inputs
 - Maintain the input order in the output
+- If Translation is impossible or the translation is the same as the input, output empty text for that item
 """
 
     def do_translation(self, batch: list[OcrResult]):
-        input_dict = { "texts": []}
-        for item in batch:
-            input_dict["texts"].append({ "language": item.language, "text": item.text })
-        input_text = json.dumps(input_dict)
+        to_translate_indices = [i for i in range(len(batch)) if batch[i].language != self.target_lang]
+        
+        result = [TranslatorResult(lang_code=self.target_lang) for _ in batch]
+
+        input_str = "\n".join([f"({i})[{batch[i].language}]: {batch[i].text}" for i in to_translate_indices])
 
         response = self.openai.responses.parse(
             model=self.model,
             reasoning={"effort": "low"},
-            instructions=self.instructions,
-            input=input_text,
+            instructions=self.instructions + f"\nYOU MUST OUTPUT {len(batch)} results",
+            input=input_str,
             text_format = _OpenAITranslationResults
         )
-
+        
         if response.output_parsed is not None:
-            return [TranslatorResult(text=x, lang_code=self.target_lang) for x in response.output_parsed.translations]
+            for translation,i in zip(response.output_parsed.translations,to_translate_indices):
+                result[i].text = translation
         else:
             raise BaseException("Openai Translation failed")
 
+        return result
         
-
+    @perf_async
     async def translate(self, batch: list[OcrResult]):
         if len(batch) == 0:
             return []
-        return await asyncio.to_thread(self.do_translation, batch)
+        results = await asyncio.to_thread(self.do_translation, batch)
+
+        assert len(results) == len(batch), f"batch size was {len(batch)} but result size is {len(results)}"
+        return results
 
     @staticmethod
     def get_name() -> str:

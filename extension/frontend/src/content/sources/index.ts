@@ -1,51 +1,38 @@
-import { ImageSource } from "./ImageSource"
-import { PictureSource } from "./PictureSource"
+import { getSingleFactories } from "./factories"
 import { SourceTags } from "./SourceTags"
 import type { ISource } from "./types"
 
-const ELEMENTS_TO_SOURCES = new Map<HTMLElement,ISource>()
-const ELEMENT_IDS_TO_SOURCES = new Map<string,ISource>()
 
-let targetSource: ISource | undefined = undefined
+const ELEMENTS_TO_SOURCES = new Map<HTMLElement, ISource>()
+const ELEMENT_IDS_TO_SOURCES = new Map<string, ISource>()
+let targetElement: HTMLElement | undefined = undefined
 document.addEventListener("contextmenu", (e) => {
-    let contextTarget = e.target as HTMLElement | null ?? undefined
-    if(contextTarget instanceof HTMLImageElement){
-        if(contextTarget.parentElement instanceof HTMLPictureElement){
-            contextTarget = contextTarget.parentElement
-        }
-    }
-    else
-    {
-        contextTarget = undefined
-    }
+    const target = e.target
+    if (target === null) return
+    if (!(target instanceof HTMLElement)) return
+    targetElement = target
 
-    if(contextTarget === undefined) {
-        targetSource = undefined
-        return
-    }
-
-    if(!ELEMENTS_TO_SOURCES.has(contextTarget)){
-        let newSource: ISource
-        if(contextTarget instanceof HTMLImageElement){
-            newSource = new ImageSource(contextTarget)
-        }
-        else if(contextTarget instanceof HTMLPictureElement){
-            newSource = new PictureSource(contextTarget)
-        }
-        else{
-            throw new Error("Unknown source type, how did we even get here ?")
-        }
-        ELEMENTS_TO_SOURCES.set(contextTarget,newSource)
-        ELEMENT_IDS_TO_SOURCES.set(newSource.getId(),newSource)
-        targetSource = newSource
-    }
-    else{
-        targetSource = ELEMENTS_TO_SOURCES.get(contextTarget)
-    }
 })
 
 export const getContextMenuSourceTarget = () => {
-    return targetSource
+    if (targetElement === undefined) return undefined
+
+    const factories = getSingleFactories()
+
+    for (const factory of factories) {
+        const result = factory(targetElement, ELEMENTS_TO_SOURCES);
+        if (result !== undefined) {
+            ELEMENTS_TO_SOURCES.set(result.context.element, result.context.source)
+            ELEMENT_IDS_TO_SOURCES.set(result.context.source.getId(), result.context.source)
+            for (const item of result.related) {
+                ELEMENTS_TO_SOURCES.set(item.element, item.source)
+                ELEMENT_IDS_TO_SOURCES.set(item.source.getId(), item.source)
+            }
+            return [result.context.source,...result.related.map(c => c.source)]
+        }
+    }
+
+    return undefined
 }
 
 export const getSourceById = (id: string) => {
@@ -57,4 +44,5 @@ export const getSourceById = (id: string) => {
     return target
 }
 
+export const getTargetElement = () => targetElement
 export { SourceTags }

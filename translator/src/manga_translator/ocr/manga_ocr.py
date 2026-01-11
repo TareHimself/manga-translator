@@ -12,6 +12,7 @@ from manga_translator.core.plugin import (
 from manga_translator.utils import cv2_to_pil, get_default_torch_device
 import asyncio
 from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel, GenerationMixin
+from manga_translator.utils import perf_async
 
 class _MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
     pass
@@ -21,7 +22,7 @@ class MangaOCR(OCR):
 
     def __init__(self, model_url: str = "kha-white/manga-ocr-base",device: torch.device = get_default_torch_device()) -> None:
         super().__init__()
-        self.processor = AutoImageProcessor.from_pretrained(model_url)
+        self.processor = AutoImageProcessor.from_pretrained(model_url,use_fast=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_url)
         self.model = _MangaOcrModel.from_pretrained(model_url)
         self.model.to(device)
@@ -52,7 +53,7 @@ class MangaOCR(OCR):
             # should explore using more than just the first element in the future
             return [OcrResult(text=x,language=self.output_language) for x in map(self.post_process,y)]
     
-
+    @perf_async
     async def extract(self, batch: list[np.ndarray]):
         return await asyncio.to_thread(self.extract_with_model,batch)
 
