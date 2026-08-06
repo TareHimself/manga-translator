@@ -2,12 +2,12 @@ import colorsys
 from contextlib import nullcontext
 import cv2
 import langcodes
+import numba as nb
 import torch
 import numpy as np
 import pyphen
 from more_itertools import split_when
 from typing import Awaitable, Callable, Optional, ParamSpec, TypeVar, overload
-import largestinteriorrectangle as lir
 from PIL import Image, ImageFont
 from comic_localizer.core.typing import Vector4i, Vector3u8
 import functools
@@ -500,6 +500,56 @@ def ensure_gray(img: np.ndarray) -> np.ndarray:
     return img.copy()
 
 
+@nb.njit("int64[:](boolean[:,::1])", cache=True)
+def maximal_rectangle(grid: np.ndarray) -> np.ndarray:
+    """
+    Largest axis-aligned all-true rectangle in a boolean grid, via the
+    classic histogram + monotonic stack algorithm. Exact, O(rows * cols).
+    Returns [x, y, width, height]. Operates directly on the grid, so it
+    can't miss interior obstacles that don't touch the outer boundary.
+    """
+    h, w = grid.shape
+    heights = np.zeros(w, dtype=np.int64)
+    best_area = 0
+    best_x = 0
+    best_y = 0
+    best_w = 0
+    best_h = 0
+
+    stack_idx = np.zeros(w + 1, dtype=np.int64)
+    stack_h = np.zeros(w + 1, dtype=np.int64)
+
+    for y in range(h):
+        for x in range(w):
+            if grid[y, x]:
+                heights[x] += 1
+            else:
+                heights[x] = 0
+
+        sp = 0
+        for i in range(w + 1):
+            cur_h = heights[i] if i < w else 0
+            start = i
+            while sp > 0 and stack_h[sp - 1] > cur_h:
+                sp -= 1
+                idx = stack_idx[sp]
+                height = stack_h[sp]
+                width = i - idx
+                area = height * width
+                if area > best_area:
+                    best_area = area
+                    best_w = width
+                    best_h = height
+                    best_x = idx
+                    best_y = y - height + 1
+                start = idx
+            stack_idx[sp] = start
+            stack_h[sp] = cur_h
+            sp += 1
+
+    return np.array([best_x, best_y, best_w, best_h], dtype=np.int64)
+
+
 def compute_draw_bbox(section: np.ndarray) -> Vector4i:
     grey = ensure_gray(section)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
@@ -508,13 +558,11 @@ def compute_draw_bbox(section: np.ndarray) -> Vector4i:
 
     min_dim = min(height, width)
 
-    scale_to = 500
+    scale_to = 256
     scale = 1
     # Scaling for consistent kernel ops
-    if min_dim < scale_to:
+    if min_dim != scale_to:
         scale = scale_to / float(min_dim)
-    elif min_dim > scale_to:
-        scale = min_dim / float(scale_to)
 
     if scale != 1:
         new_width = round(width * scale)
@@ -547,24 +595,27 @@ def compute_draw_bbox(section: np.ndarray) -> Vector4i:
     # pad and invert since bubble is probably black and cv2.findContours needs it white
     padded[start : start + height, start : start + width] = 255 - morphed
 
-    contours, hierarchy = cv2.findContours(
+    # interior content (residue, background showing through) gets painted
+    # over by the opaque text regardless, so fill it in rather than treating it as an obstacle.
+    contours, _hierarchy = cv2.findContours(
         padded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
 
     if len(contours) == 0:
         return np.array([0, 0, width, height], dtype=np.int32)
 
-    largest_contour = max(contours, key=cv2.contourArea)[:, 0, :]
+    largest_contour = max(contours, key=cv2.contourArea)
 
-    if len(largest_contour) < 2:
+    solid = np.zeros_like(padded)
+    cv2.fillPoly(solid, [largest_contour], (255,))
+
+    rect = maximal_rectangle(solid > 0)
+
+    if rect[2] == 0 or rect[3] == 0:
         return np.array([0, 0, width, height], dtype=np.int32)
 
-    polygon = np.array([largest_contour], dtype=np.int32)
-
-    rect = lir.lir(polygon)
-
-    p1x, p1y = lir.pt1(rect)
-    p2x, p2y = lir.pt2(rect)
+    p1x, p1y = rect[0], rect[1]
+    p2x, p2y = rect[0] + rect[2] - 1, rect[1] + rect[3] - 1
 
     p1x = np.maximum(0, floor((p1x - padding) / scale))
     p1y = np.maximum(0, floor((p1y - padding) / scale))

@@ -81,19 +81,30 @@ class PatchedAiCleaner(Cleaner):
 
         for key in groups:
             a: list[_AiImagePatch] = []
-            working_pixels = 0
+            max_h = 0
+            max_w = 0
             for patch in groups[key]:
                 h, w, _ = patch.patch.shape
-                pixels = h * w * 4  # 3 channels for image, 1 for mask
-                if (working_pixels + pixels) > self.max_group_pixels and len(a) > 0:
+                new_max_h = max(max_h, h)
+                new_max_w = max(max_w, w)
+                # every patch in the group gets padded up to the group's max
+                # dimensions before being stacked into one batch tensor, so
+                # the real cost of adding this patch is (count so far + 1)
+                # patches all at the new max size -- not this patch's own
+                # (unpadded) size
+                projected_pixels = (
+                    (len(a) + 1) * new_max_h * new_max_w * 4
+                )  # 3 channels for image, 1 for mask
+                if projected_pixels > self.max_group_pixels and len(a) > 0:
                     final_groups.append(a)
-                    working_pixels = pixels
                     a = [patch]
+                    max_h, max_w = h, w
                 else:
-                    working_pixels += pixels
                     a.append(patch)
+                    max_h, max_w = new_max_h, new_max_w
 
-            final_groups.append(a)
+            if len(a) > 0:
+                final_groups.append(a)
         return final_groups
 
     @staticmethod
