@@ -97,7 +97,8 @@ class ImageToImagePipeline(Pipeline):
     ) -> list[FrameSection]:
         sections = []
         # should work better than just black
-        text_only = cv2.inpaint(frame, cv2.bitwise_not(mask), 1, cv2.INPAINT_NS)
+        text_only = cv2.inpaint(frame, cv2.bitwise_not(mask), 1, cv2.INPAINT_TELEA)
+
         for result in detection:
             x1, y1, x2, y2 = result.bbox
             draw_bbox = compute_draw_bbox(cleaned_frame[y1:y2, x1:x2])
@@ -120,6 +121,7 @@ class ImageToImagePipeline(Pipeline):
 
         return sections
 
+    @perf_async
     async def extract_detected_sections_batched(
         self,
         frames: list[np.ndarray],
@@ -166,6 +168,7 @@ class ImageToImagePipeline(Pipeline):
         b = cv2.bitwise_and(cleaned_frame, cleaned_frame, mask=detections_mask)
         return cv2.add(a, b)
 
+    @perf_async
     async def clean_frames_using_masks_and_detections(
         self,
         frames: list[np.ndarray],
