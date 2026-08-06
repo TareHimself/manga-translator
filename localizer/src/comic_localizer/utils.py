@@ -8,7 +8,6 @@ import numpy as np
 import pyphen
 from more_itertools import split_when
 from typing import Awaitable, Callable, Optional, ParamSpec, TypeVar, overload
-import largestinteriorrectangle as lir
 from PIL import Image, ImageFont
 from comic_localizer.core.typing import Vector4i, Vector3u8
 import functools
@@ -506,10 +505,8 @@ def maximal_rectangle(grid: np.ndarray) -> np.ndarray:
     """
     Largest axis-aligned all-true rectangle in a boolean grid, via the
     classic histogram + monotonic stack algorithm. Exact, O(rows * cols).
-    Returns [x, y, width, height], same format as largestinteriorrectangle's
-    lir() output. Unlike lir.lir(polygon) (see the commented out code in
-    compute_draw_bbox below) this operates directly on the grid, so it can't
-    miss interior obstacles that don't touch the outer boundary.
+    Returns [x, y, width, height]. Operates directly on the grid, so it
+    can't miss interior obstacles that don't touch the outer boundary.
     """
     h, w = grid.shape
     heights = np.zeros(w, dtype=np.int64)
@@ -617,8 +614,8 @@ def compute_draw_bbox(section: np.ndarray) -> Vector4i:
     if rect[2] == 0 or rect[3] == 0:
         return np.array([0, 0, width, height], dtype=np.int32)
 
-    p1x, p1y = lir.pt1(rect)
-    p2x, p2y = lir.pt2(rect)
+    p1x, p1y = rect[0], rect[1]
+    p2x, p2y = rect[0] + rect[2] - 1, rect[1] + rect[3] - 1
 
     p1x = np.maximum(0, floor((p1x - padding) / scale))
     p1y = np.maximum(0, floor((p1y - padding) / scale))

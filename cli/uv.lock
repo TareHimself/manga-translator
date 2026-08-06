@@ -162,7 +162,6 @@ dependencies = [
     { name = "jaconv" },
     { name = "langcodes" },
     { name = "language-data" },
-    { name = "largestinteriorrectangle" },
     { name = "lingua-language-detector" },
     { name = "markdown-it-py" },
     { name = "mdit-plain" },
@@ -195,7 +194,6 @@ requires-dist = [
     { name = "jaconv", specifier = ">=0.4.1" },
     { name = "langcodes", specifier = ">=3.5.1" },
     { name = "language-data", specifier = ">=1.4.0" },
-    { name = "largestinteriorrectangle", specifier = ">=0.2.1" },
     { name = "lingua-language-detector", specifier = ">=2.1.1" },
     { name = "markdown-it-py", specifier = ">=4.0.0" },
     { name = "mdit-plain", specifier = ">=1.0.1" },
@@ -727,18 +725,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/61/50/2518b4d0805f4d1f10166837829ad0bd71dcee3ec33fa84aa8c0db23c13c/language_data-1.4.0.tar.gz", hash = "sha256:800e6457e7beda781c156e02d7707e38db2ded026472e07e2c055dc8446ee574", size = 5309660, upload-time = "2025-11-28T13:45:25.217Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ad/d1/68e2bcca94c9bbdc122a71e504e0b6a6c3e31541b1bad33fee0205996006/language_data-1.4.0-py3-none-any.whl", hash = "sha256:f741927c24ab14cbed2a57bc2bfe82b00cff266c427179597e8b14123364f084", size = 5572678, upload-time = "2025-11-28T13:45:23.381Z" },
-]
-
-[[package]]
-name = "largestinteriorrectangle"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numba" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/82/5e/e67dc1d61a9600d85ad9cfb2f74ed1196c299cfb3e16ce2d1862ab895864/largestinteriorrectangle-0.2.1.tar.gz", hash = "sha256:59324f2597cc4621b029ba5cbf71d84f8125a12914a5bb7310d56fc498b002bd", size = 16427, upload-time = "2024-06-23T05:44:13.781Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/06/d5cf3f16076e10debef57d4a29583a443117e07696a77fd33acb6ee24ede/largestinteriorrectangle-0.2.1-py3-none-any.whl", hash = "sha256:ff84fc9659ebcf6445ce3ec14eb083c9301f06260c5b58c429e8bf46efe91fdb", size = 13497, upload-time = "2024-06-23T05:44:12.233Z" },
 ]
 
 [[package]]

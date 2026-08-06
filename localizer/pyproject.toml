@@ -15,7 +15,6 @@ dependencies = [
     "jaconv>=0.4.1",
     "langcodes>=3.5.1",
     "language-data>=1.4.0",
-    "largestinteriorrectangle>=0.2.1",
     "lingua-language-detector>=2.1.1",
     "markdown-it-py>=4.0.0",
     "mdit-plain>=1.0.1",
