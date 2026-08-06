@@ -598,35 +598,8 @@ def compute_draw_bbox(section: np.ndarray) -> Vector4i:
     # pad and invert since bubble is probably black and cv2.findContours needs it white
     padded[start : start + height, start : start + width] = 255 - morphed
 
-    # Previous approach: extract the outer contour and hand it straight to
-    # largestinteriorrectangle.
-    # with PerfContext("compute_draw_bbox > find_contours"):
-    #     contours, hierarchy = cv2.findContours(
-    #         padded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    #     )
-    #
-    # if len(contours) == 0:
-    #     return np.array([0, 0, width, height], dtype=np.int32)
-    #
-    # largest_contour = max(contours, key=cv2.contourArea)[:, 0, :]
-    #
-    # if len(largest_contour) < 2:
-    #     return np.array([0, 0, width, height], dtype=np.int32)
-    #
-    # polygon = np.array([largest_contour], dtype=np.int32)
-    #
-    # with PerfContext(f"compute_draw_bbox > lir ({len(largest_contour)} pts)"):
-    #     rect = lir.lir(polygon)
-
-    # bubbles are treated as potentially transparent, so we only care about
-    # the outer silhouette here -- whatever is inside (background showing
-    # through, or minor cleaning residue) gets painted over by the opaque
-    # translated text regardless, so it should never be treated as an
-    # obstacle. RETR_EXTERNAL + fillPoly reproduces the same "ignore
-    # interior content" behavior the old lir.lir(polygon) path had (it
-    # re-rasterizes the outer contour solid internally too), we just do it
-    # ourselves so maximal_rectangle can run on the (cheaper, holes-filled)
-    # grid directly instead of going through contour candidate search.
+    # interior content (residue, background showing through) gets painted
+    # over by the opaque text regardless, so fill it in rather than treating it as an obstacle.
     contours, _hierarchy = cv2.findContours(
         padded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
