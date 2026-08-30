@@ -25,7 +25,7 @@ class HorizontalDrawer(Drawer):
 
     def __init__(
         self,
-        font_file="fonts/animeace2_reg.ttf",
+        font_file: Optional[str] = None,  # required; see fonts/FONTS.md
         max_font_size=20,
         min_font_size=5,
         line_spacing=2,
@@ -33,6 +33,8 @@ class HorizontalDrawer(Drawer):
         margin=3,
     ) -> None:
         super().__init__()
+        if not font_file:
+            raise ValueError("HorizontalDrawer needs a font_file (see fonts/FONTS.md)")
         self.font_file = font_file
         self.max_font_size = round(max_font_size)
         self.min_font_size = round(min_font_size)

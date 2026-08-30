@@ -23,6 +23,7 @@ DEBUG_OCR_TEXT = "hello"
 DEBUG_OCR_LANGUAGE = "en"
 DEBUG_TRANSLATED_TEXT = "translated"
 DEBUG_TRANSLATED_LANGUAGE = "fr"
+DRAWER_FONT = "dummy.ttf"  # real rendering paths monkeypatch load_font
 
 
 @pytest.mark.asyncio
@@ -119,9 +120,15 @@ async def test_opencv_cleaner_async_clean_get_name_and_is_valid():
     assert OpenCvCleaner.is_valid() is True
 
 
+def test_horizontal_drawer_requires_a_font_file():
+    """No font ships with the repo, so a font_file must be supplied."""
+    with pytest.raises(ValueError):
+        HorizontalDrawer()
+
+
 def test_horizontal_drawer_draw_text_returns_empty_mask_for_blank_text():
     """Drawer should no-op when translation text is blank or whitespace only."""
-    drawer = HorizontalDrawer()
+    drawer = HorizontalDrawer(font_file=DRAWER_FONT)
     frame = np.zeros((10, 10, 3), dtype=np.uint8)
     translation = TranslatorResult(text="   ", language="en")
     color = ColorDetectionResult(np.array([255, 255, 255], dtype=np.uint8))
@@ -134,7 +141,7 @@ def test_horizontal_drawer_draw_text_returns_empty_mask_for_blank_text():
 
 def test_horizontal_drawer_draw_text_returns_empty_mask_when_fit_fails(monkeypatch):
     """Drawer should no-op when font fitting cannot find any valid wrapping."""
-    drawer = HorizontalDrawer()
+    drawer = HorizontalDrawer(font_file=DRAWER_FONT)
     frame = np.zeros((10, 10, 3), dtype=np.uint8)
     translation = TranslatorResult(text="hello", language="en")
     color = ColorDetectionResult(np.array([255, 255, 255], dtype=np.uint8))
@@ -153,7 +160,7 @@ def test_horizontal_drawer_draw_text_renders_requested_rgb_color(monkeypatch):
     """Drawn text pixels must use the requested RGB color, not have red/blue swapped."""
     from PIL import ImageFont
 
-    drawer = HorizontalDrawer()
+    drawer = HorizontalDrawer(font_file=DRAWER_FONT)
     frame = np.zeros((40, 40, 3), dtype=np.uint8)
     translation = TranslatorResult(text="A", language="en")
     red = np.array([255, 0, 0], dtype=np.uint8)
@@ -185,7 +192,7 @@ def test_horizontal_drawer_draw_text_renders_requested_rgb_color(monkeypatch):
 @pytest.mark.asyncio
 async def test_horizontal_drawer_async_draw_returns_pair_for_each_item(monkeypatch):
     """Async draw should return one (drawn, mask) tuple per frame."""
-    drawer = HorizontalDrawer()
+    drawer = HorizontalDrawer(font_file=DRAWER_FONT)
     frame = np.zeros((8, 8, 3), dtype=np.uint8)
     translation = TranslatorResult(text="hello", language="en")
     color = ColorDetectionResult(np.array([255, 255, 255], dtype=np.uint8))
