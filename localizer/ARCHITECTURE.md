@@ -109,7 +109,7 @@ one name → class registry (`get_all()`), and exposes:
 | Cleaner | `AllWhiteCleaner`, `OpenCvCleaner` (`cv2.inpaint`), `LamaCleaner`, `DeepFillV2Cleaner` (both share `PatchedAiCleaner`: torch-scripted inpainting models, optionally run per-patch instead of on the whole frame) |
 | ColorDetector | `BasicColorDetector` (black-on-white heuristic), `OpenAiColorDetector` |
 | OCR | `DebugOCR`, `MangaOCR`, `HuggingFaceOCR`, `OpenAiOCR`, `MinstralOCR`, `GoogleCloudOCR` |
-| Translator | `DebugTranslator`, `PipeTranslator` (passthrough), `DeepLTranslator`, `HuggingFaceTranslator`, `OpenAiTranslator` |
+| Translator | `DebugTranslator`, `PipeTranslator` (passthrough), `CTranslateTranslator`, `DeepLTranslator`, `HuggingFaceTranslator`, `OpenAiTranslator` |
 | Drawer | `HorizontalDrawer` (font-fit + wrap text renderer) |
 
 ## Color-space convention
