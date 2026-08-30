@@ -13,17 +13,12 @@ from comic_localizer.core.plugin import (
 from comic_localizer.utils import (
     cv2_to_pil,
     get_default_language,
-    standardize_language_code,
+    lingua_lang_to_lang_code,
 )
 from lingua import Language, LanguageDetectorBuilder
 from typing import Optional
 from markdown_it import MarkdownIt
 from mdit_plain.renderer import RendererPlain
-
-
-def lingua_lang_to_lang_code(language: Language):
-    tag = repr(language.iso_code_639_3).split(".")[-1].lower()
-    return standardize_language_code(tag)
 
 
 class MinstralOCR(OCR):

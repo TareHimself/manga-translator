@@ -187,6 +187,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyphen" },
     { name = "pyyaml" },
+    { name = "rectpack" },
     { name = "sacremoses" },
     { name = "sentencepiece" },
     { name = "transformers" },
@@ -219,6 +220,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyphen", specifier = ">=0.17.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "rectpack", specifier = ">=0.2.2" },
     { name = "sacremoses", specifier = ">=0.1.1" },
     { name = "sentencepiece", specifier = ">=0.2.1" },
     { name = "transformers", specifier = ">=4.57.3" },
@@ -1974,6 +1976,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/7a/1c7270340330e575b92f397352af856a8c06f230aa3e76f86b39d01b416a/pyyaml-6.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4ad1906908f2f5ae4e5a8ddfce73c320c2a1429ec52eafd27138b7f1cbe341c9", size = 174062, upload-time = "2025-09-25T21:32:55.767Z" },
     { url = "https://files.pythonhosted.org/packages/f1/12/de94a39c2ef588c7e6455cfbe7343d3b2dc9d6b6b2f40c4c6565744c873d/pyyaml-6.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:ebc55a14a21cb14062aa4162f906cd962b28e2e9ea38f9b4391244cd8de4ae0b", size = 149341, upload-time = "2025-09-25T21:32:56.828Z" },
 ]
+
+[[package]]
+name = "rectpack"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/72/b965bbfcfe5bcd486bbfc10a73345d51551971457ac2b84f786bfc6d86db/rectpack-0.2.2.tar.gz", hash = "sha256:15e383505fdfbaeb55ec640a5825d9ca2ce89019a6cdd552d6e57ec36c68ba2a", size = 17888, upload-time = "2021-11-24T21:12:56.557Z" }
 
 [[package]]
 name = "regex"

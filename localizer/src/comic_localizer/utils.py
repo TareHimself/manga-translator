@@ -8,6 +8,7 @@ import numpy as np
 import pyphen
 from more_itertools import split_when
 from typing import Awaitable, Callable, Optional, ParamSpec, TypeVar, overload
+from lingua import Language
 from PIL import Image, ImageFont
 from comic_localizer.core.typing import Vector4i, Vector3u8
 import functools
@@ -693,3 +694,8 @@ def standardize_language_code(language: str):
 
 def get_default_language() -> str:
     return standardize_language_code("en-US")
+
+
+def lingua_lang_to_lang_code(language: Language):
+    tag = repr(language.iso_code_639_3).split(".")[-1].lower()
+    return standardize_language_code(tag)
