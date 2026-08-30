@@ -10,6 +10,8 @@ dependencies = [
     "poethepoet>=0.39.0",
     "python-dotenv>=1.2.1",
     "uvicorn>=0.40.0",
+    "torch",
+    "torchvision",
 ]
 
 
