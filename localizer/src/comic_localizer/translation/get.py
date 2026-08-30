@@ -1,5 +1,6 @@
 from typing import Sequence
 from comic_localizer.core.plugin import Translator
+from comic_localizer.translation.ctranslate import CTranslateTranslator
 from comic_localizer.translation.deepl import DeepLTranslator
 from comic_localizer.translation.huggingface import HuggingFaceTranslator
 from comic_localizer.translation.openai import OpenAiTranslator
@@ -11,6 +12,7 @@ _translator_data = list(
         lambda a: a.is_valid(),
         [
             DebugTranslator,
+            CTranslateTranslator,
             DeepLTranslator,
             HuggingFaceTranslator,
             OpenAiTranslator,
