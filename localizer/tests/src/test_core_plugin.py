@@ -132,7 +132,7 @@ async def test_base_ocr_translator_detector_and_segmenter_contracts():
     assert translated[0].text == ""
 
     detections = await detector(frames)
-    segments = await segmenter(frames)
+    segments = await segmenter(frames, detections)
 
     assert detections == [[]]
     assert segments == [[]]

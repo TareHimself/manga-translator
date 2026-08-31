@@ -2,6 +2,7 @@ import numpy as np
 
 from comic_localizer.core.constants import SegmentationType
 from comic_localizer.core.plugin import (
+    DetectionResult,
     PluginArgument,
     PytorchDevicePluginArgument,
     StringPluginArgument,
@@ -61,7 +62,11 @@ class YoloSegmenter(Segmenter):
 
             return results
 
-    async def segment(self, frames: list[np.ndarray]) -> list[list[SegmentationResult]]:
+    async def segment(
+        self,
+        frames: list[np.ndarray],
+        detections: list[list[DetectionResult]],
+    ) -> list[list[SegmentationResult]]:
         return await asyncio.to_thread(self.predict, frames)
 
     @staticmethod
