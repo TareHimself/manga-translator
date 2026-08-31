@@ -71,6 +71,32 @@ def test_construct_plugin_uses_convert_and_skips_unknown_keys():
     assert plugin.enabled is True
 
 
+def test_int_and_bool_arguments_coerce_string_values_by_default():
+    """IntPluginArgument / BooleanPluginArgument should coerce string inputs
+    (yaml, form posts) even without an explicit convert_fn."""
+
+    class StringySettings(BasePlugin):
+        def __init__(self, count=0, flag=False):
+            super().__init__()
+            self.count = count
+            self.flag = flag
+
+        @staticmethod
+        def get_arguments():
+            return [
+                IntPluginArgument("count", "Count", "How many", default=0),
+                BooleanPluginArgument("flag", "Flag", "Enabled", default=False),
+            ]
+
+    plugin = construct_plugin(StringySettings, {"count": "5", "flag": "true"})
+    assert plugin.count == 5
+    assert plugin.flag is True
+
+    off = construct_plugin(StringySettings, {"count": 2.0, "flag": "no"})
+    assert off.count == 2
+    assert off.flag is False
+
+
 def test_plugin_argument_serialization_variants():
     """Argument objects should serialize with expected type ids and option payloads."""
     select = SelectPluginArgument(
