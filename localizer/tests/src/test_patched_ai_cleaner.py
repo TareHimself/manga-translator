@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from comic_localizer.cleaning.patched_ai_cleaner import PatchedAiCleaner
+from comic_localizer.cleaning.lama import LamaCleaner
 from comic_localizer.core.constants import DetectionType, SegmentationType
 from comic_localizer.core.plugin import DetectionResult, SegmentationResult
 
@@ -68,3 +69,51 @@ def test_clean_sync_without_patching_preserves_caller_frames_and_composites_corr
     assert out[6, 6, 0] == pytest.approx(127, abs=2)
     # Outside the detection box: original content (black), not the cleaned constant.
     assert np.array_equal(out[0, 0], np.array([0, 0, 0], dtype=np.uint8))
+
+
+def test_resolve_model_path_returns_existing_local_file(tmp_path):
+    f = tmp_path / "model.pt"
+    f.write_bytes(b"not really a model")
+    assert PatchedAiCleaner.resolve_model_path(str(f)) == str(f)
+
+
+def test_resolve_model_path_rejects_non_file_non_repo_string():
+    with pytest.raises(ValueError):
+        PatchedAiCleaner.resolve_model_path("just-a-name")
+
+
+def test_resolve_model_path_requires_a_default_or_argument():
+    # base class has no DEFAULT_MODEL_REPO
+    with pytest.raises(ValueError):
+        PatchedAiCleaner.resolve_model_path(None)
+
+
+def test_resolve_model_path_uses_subclass_default(monkeypatch):
+    calls = {}
+
+    def fake_download(repo, filename):
+        calls["repo"], calls["filename"] = repo, filename
+        return f"/cache/{filename}"
+
+    monkeypatch.setattr(
+        "comic_localizer.cleaning.patched_ai_cleaner.hf_hub_download", fake_download
+    )
+
+    assert LamaCleaner.resolve_model_path(None) == "/cache/anime_manga_lama.pt"
+    assert calls["repo"] == LamaCleaner.DEFAULT_MODEL_REPO
+    assert calls["filename"] == LamaCleaner.DEFAULT_MODEL_FILE
+
+
+def test_resolve_model_path_accepts_repo_with_explicit_filename(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        "comic_localizer.cleaning.patched_ai_cleaner.hf_hub_download",
+        lambda repo, filename: seen.update(repo=repo, filename=filename) or "/cache/x",
+    )
+    LamaCleaner.resolve_model_path("owner/name:weights.pt")
+    assert seen == {"repo": "owner/name", "filename": "weights.pt"}
+
+
+def test_lama_cleaner_exposes_default_model_in_arguments():
+    default = {a.id: a.default for a in LamaCleaner.get_arguments()}["model_path"]
+    assert default == LamaCleaner.DEFAULT_MODEL_REPO

@@ -106,7 +106,7 @@ one name → class registry (`get_all()`), and exposes:
 |---|---|
 | Detector | `YoloDetector` (Ultralytics YOLO) |
 | Segmenter | `YoloSegmenter` (Ultralytics YOLO, instance segmentation) |
-| Cleaner | `AllWhiteCleaner`, `OpenCvCleaner` (`cv2.inpaint`), `LamaCleaner`, `DeepFillV2Cleaner` (both share `PatchedAiCleaner`: torch-scripted inpainting models, optionally run per-patch instead of on the whole frame) |
+| Cleaner | `AllWhiteCleaner`, `OpenCvCleaner` (`cv2.inpaint`), `LamaCleaner`, `DeepFillV2Cleaner` (both share `PatchedAiCleaner`: torch-scripted inpainting models, optionally run per-patch instead of on the whole frame). `LamaCleaner` needs no `model_path` -- it pulls its default model from the Hub; `model_path` may be a local file, a `owner/name` repo id, or `owner/name:filename`. |
 | ColorDetector | `BasicColorDetector` (black-on-white heuristic), `OpenAiColorDetector` |
 | OCR | `DebugOCR`, `MangaOCR`, `HuggingFaceOCR`, `OpenAiOCR`, `MinstralOCR`, `GoogleCloudOCR` |
 | Translator | `DebugTranslator`, `PipeTranslator` (passthrough), `CTranslateTranslator`, `DeepLTranslator`, `HuggingFaceTranslator`, `OpenAiTranslator` |
