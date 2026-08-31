@@ -9,11 +9,13 @@ from comic_localizer.core.plugin import (
     BooleanPluginArgument,
     StringPluginArgument,
 )
+import os
 import numpy as np
 import cv2
 import asyncio
 import torch
 import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
 from comic_localizer.utils import get_default_torch_device
 from collections import defaultdict
 
@@ -41,9 +43,14 @@ class PatchedAiCleaner(Cleaner):
     Base class for ai based cleaners that support patch inpaining.
     """
 
+    # Subclasses point these at a torchscript model on the Hugging Face Hub so
+    # the cleaner works with no configuration. `model_path` overrides them.
+    DEFAULT_MODEL_REPO: str | None = None
+    DEFAULT_MODEL_FILE: str | None = None
+
     def __init__(
         self,
-        model_path: str,
+        model_path: str | None = None,
         inpaint_patches=True,
         patch_padding=4,
         device: torch.device = get_default_torch_device(),
@@ -63,8 +70,45 @@ class PatchedAiCleaner(Cleaner):
         self.max_group_pixels = max_group_pixels
         self.zero_max = np.zeros((2), dtype=np.int32)
 
-    def load_model(self, model_path: str, device: torch.device) -> torch.jit.ScriptModule:
-        return torch.jit.load(model_path, map_location=device).eval()  # type: ignore[return-value]
+    @classmethod
+    def resolve_model_path(cls, model_path: str | None) -> str:
+        """Turn `model_path` into a local file path.
+
+        Accepts a local path, a Hugging Face repo id (``owner/name``, which
+        pulls ``DEFAULT_MODEL_FILE``), a ``owner/name:filename`` pair, or
+        ``None`` to use the subclass defaults. Hub files are downloaded and
+        cached by ``huggingface_hub``.
+        """
+        if model_path and os.path.isfile(model_path):
+            return model_path
+
+        repo: str | None = None
+        filename: str | None = None
+        if model_path and "/" in model_path:
+            repo, _, filename = model_path.partition(":")
+        elif model_path:
+            raise ValueError(
+                f"{cls.__name__}: model_path {model_path!r} is neither an existing "
+                "file nor a 'owner/name' Hugging Face repo id"
+            )
+
+        repo = repo or cls.DEFAULT_MODEL_REPO
+        filename = filename or cls.DEFAULT_MODEL_FILE
+        if not repo:
+            raise ValueError(
+                f"{cls.__name__}: no model_path given and no DEFAULT_MODEL_REPO set"
+            )
+        if not filename:
+            raise ValueError(
+                f"{cls.__name__}: model repo {repo!r} needs a ':<filename>' suffix"
+            )
+        return hf_hub_download(repo, filename)
+
+    def load_model(
+        self, model_path: str | None, device: torch.device
+    ) -> torch.jit.ScriptModule:
+        path = self.resolve_model_path(model_path)
+        return torch.jit.load(path, map_location=device).eval()  # type: ignore[return-value]
 
     def group_patches(self, patches: list[_AiImagePatch]):
         # we can do some kind of size based grouping to batch here
@@ -296,11 +340,16 @@ class PatchedAiCleaner(Cleaner):
             self.clean_sync, frames, masks, segments, detections
         )
 
-    @staticmethod
-    def get_arguments() -> list[PluginArgument]:
+    @classmethod
+    def get_arguments(cls) -> list[PluginArgument]:
         return [
             StringPluginArgument(
-                "model_path", "Model Path", "Path to the torch script model"
+                "model_path",
+                "Model",
+                "Local path to a torchscript model, a Hugging Face repo id "
+                "('owner/name'), or 'owner/name:filename'. Leave blank to use "
+                "this cleaner's default model on the Hub.",
+                default=cls.DEFAULT_MODEL_REPO or "",
             ),
             BooleanPluginArgument(
                 "inpaint_patches",
