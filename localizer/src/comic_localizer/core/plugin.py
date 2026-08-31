@@ -68,8 +68,15 @@ class IntPluginArgument(PluginArgument):
     def __init__(
         self, id: str, name: str, description: str, default: int = 0, convert_fn=None
     ) -> None:
-        super().__init__(id, name, description, default, convert_fn)
+        # clients may hand args in as strings (form posts, yaml); coerce
+        super().__init__(id, name, description, default, convert_fn or int)
         self.type = PluginArgumentType.INT
+
+
+def _to_bool(value) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
 
 
 class BooleanPluginArgument(PluginArgument):
@@ -81,7 +88,7 @@ class BooleanPluginArgument(PluginArgument):
         default: bool = False,
         convert_fn=None,
     ) -> None:
-        super().__init__(id, name, description, default, convert_fn)
+        super().__init__(id, name, description, default, convert_fn or _to_bool)
         self.type = PluginArgumentType.BOOLEAN
 
 
