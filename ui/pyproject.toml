@@ -4,12 +4,11 @@ version = "1.0.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
-    "blacksheep>=2.4.5",
-    "dataclass-wizard>=0.39.1",
     "comic-localizer",
+    "gradio>=6.0,<7",
     "poethepoet>=0.39.0",
     "python-dotenv>=1.2.1",
-    "uvicorn>=0.40.0",
+    "pyyaml>=6.0",
     "torch",
     "torchvision",
 ]
@@ -30,6 +29,6 @@ torchvision = [
 comic-localizer = { path = "../localizer", editable = true }
 
 [tool.poe.tasks.start]
-help = "run the server using uvicorn"
-cmd  = "uvicorn main:app  --host 0.0.0.0 --port 5000"
+help = "run the Gradio UI"
+cmd  = "python gradio_app.py"
 
