@@ -12,6 +12,7 @@ dependencies = [
     "einops>=0.8.1",
     "fugashi>=1.5.2",
     "hf-xet>=1.2.0",
+    "huggingface-hub>=0.26",
     "httpx>=0.28.1",
     "jaconv>=0.4.1",
     "langcodes>=3.5.1",

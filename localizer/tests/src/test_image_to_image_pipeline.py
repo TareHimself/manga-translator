@@ -42,7 +42,7 @@ class StubSegmenter(Segmenter):
     def __init__(self, segments):
         self._segments = segments
 
-    async def segment(self, frames):
+    async def segment(self, frames, detections):
         return self._segments
 
 

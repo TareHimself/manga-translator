@@ -353,14 +353,20 @@ class Segmenter(BasePlugin):
     def __init__(self) -> None:
         super().__init__()
 
-    async def segment(self, frames: list[np.ndarray]) -> list[list[SegmentationResult]]:
+    async def segment(
+        self,
+        frames: list[np.ndarray],
+        detections: list[list[DetectionResult]],
+    ) -> list[list[SegmentationResult]]:
         return [[] for _ in frames]
 
     @perf_async(name_override="segment")
     async def __call__(
-        self, frames: list[np.ndarray]
+        self,
+        frames: list[np.ndarray],
+        detections: list[list[DetectionResult]],
     ) -> list[list[SegmentationResult]]:
-        return await self.segment(frames)
+        return await self.segment(frames, detections)
 
 
 class Cleaner(BasePlugin):

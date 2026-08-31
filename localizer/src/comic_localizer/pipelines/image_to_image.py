@@ -236,7 +236,7 @@ class ImageToImagePipeline(Pipeline):
         # prep for other plugins
         raw_translatable_frames = [item.frame for item in translatable_frames]
         detections = [item.detections for item in translatable_frames]
-        segments = await self.segmenter(raw_translatable_frames)
+        segments = await self.segmenter(raw_translatable_frames, detections)
 
         for item, item_segments in zip(translatable_frames, segments):
             item.segments = item_segments
