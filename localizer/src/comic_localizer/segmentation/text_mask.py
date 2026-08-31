@@ -164,7 +164,7 @@ class TextMaskSegmenter(Segmenter):
                 "repo", "Model Repo", "HuggingFace model repo id", _DEFAULT_REPO
             ),
             StringPluginArgument(
-                "revision", "Revision", "Tag / branch / commit (blank = latest)", "v1"
+                "revision", "Revision", "Tag / branch / commit (blank = latest)", "v3"
             ),
             PytorchDevicePluginArgument("device", "Device"),
             IntPluginArgument(
