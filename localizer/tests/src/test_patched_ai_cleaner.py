@@ -1,10 +1,11 @@
-"""Tests for PatchedAiCleaner mask polarity and non-patched compositing correctness."""
+"""Tests for PatchedAiCleaner mask polarity / compositing and per-cleaner model loading."""
 
 import numpy as np
 import pytest
 import torch
 
 from comic_localizer.cleaning.patched_ai_cleaner import PatchedAiCleaner
+from comic_localizer.cleaning.deepfillv2 import DeepFillV2Cleaner
 from comic_localizer.cleaning.lama import LamaCleaner
 from comic_localizer.core.constants import DetectionType, SegmentationType
 from comic_localizer.core.plugin import DetectionResult, SegmentationResult
@@ -22,10 +23,8 @@ class _ConstantInpaintModel:
 
 
 def _make_cleaner(monkeypatch, model=None, **kwargs) -> PatchedAiCleaner:
-    monkeypatch.setattr(
-        PatchedAiCleaner, "load_model", lambda self, path, device: model
-    )
-    return PatchedAiCleaner(model_path="unused", **kwargs)
+    monkeypatch.setattr(PatchedAiCleaner, "load_model", lambda self, device: model)
+    return PatchedAiCleaner(**kwargs)
 
 
 def test_extract_patches_mask_background_is_zero_not_one(monkeypatch):
@@ -71,49 +70,79 @@ def test_clean_sync_without_patching_preserves_caller_frames_and_composites_corr
     assert np.array_equal(out[0, 0], np.array([0, 0, 0], dtype=np.uint8))
 
 
-def test_resolve_model_path_returns_existing_local_file(tmp_path):
-    f = tmp_path / "model.pt"
-    f.write_bytes(b"not really a model")
-    assert PatchedAiCleaner.resolve_model_path(str(f)) == str(f)
+def test_base_class_load_model_must_be_overridden():
+    """PatchedAiCleaner is abstract in practice: constructing it (which calls
+    load_model) without a subclass override raises."""
+    with pytest.raises(NotImplementedError):
+        PatchedAiCleaner()
 
 
-def test_resolve_model_path_rejects_non_file_non_repo_string():
-    with pytest.raises(ValueError):
-        PatchedAiCleaner.resolve_model_path("just-a-name")
+def test_base_arguments_no_longer_expose_a_model_path():
+    ids = {a.id for a in PatchedAiCleaner.get_arguments()}
+    assert "model_path" not in ids
+    assert {"inpaint_patches", "patch_padding", "device"} <= ids
 
 
-def test_resolve_model_path_requires_a_default_or_argument():
-    # base class has no DEFAULT_MODEL_REPO
-    with pytest.raises(ValueError):
-        PatchedAiCleaner.resolve_model_path(None)
-
-
-def test_resolve_model_path_uses_subclass_default(monkeypatch):
-    calls = {}
-
-    def fake_download(repo, filename):
-        calls["repo"], calls["filename"] = repo, filename
-        return f"/cache/{filename}"
-
-    monkeypatch.setattr(
-        "comic_localizer.cleaning.patched_ai_cleaner.hf_hub_download", fake_download
-    )
-
-    assert LamaCleaner.resolve_model_path(None) == "/cache/anime_manga_lama.pt"
-    assert calls["repo"] == LamaCleaner.DEFAULT_MODEL_REPO
-    assert calls["filename"] == LamaCleaner.DEFAULT_MODEL_FILE
-
-
-def test_resolve_model_path_accepts_repo_with_explicit_filename(monkeypatch):
+def test_deepfillv2_loads_from_its_model_path(monkeypatch):
     seen = {}
+    sentinel = object()
+
+    def fake_load(path, map_location=None):
+        seen["path"], seen["map_location"] = path, map_location
+
+        class _M:
+            def eval(self_inner):
+                return sentinel
+
+        return _M()
+
+    monkeypatch.setattr(torch.jit, "load", fake_load)
+
+    cleaner = DeepFillV2Cleaner(model_path="/models/deepfill.pt", device=torch.device("cpu"))
+
+    assert cleaner.model is sentinel
+    assert seen["path"] == "/models/deepfill.pt"
+    assert seen["map_location"] == torch.device("cpu")
+
+
+def test_deepfillv2_exposes_model_path_plus_the_base_arguments():
+    ids = [a.id for a in DeepFillV2Cleaner.get_arguments()]
+    assert ids[0] == "model_path"
+    assert {"inpaint_patches", "patch_padding", "device"} <= set(ids)
+
+
+def test_lama_downloads_its_model_from_the_hub(monkeypatch):
+    seen = {}
+    sentinel = object()
+
     monkeypatch.setattr(
-        "comic_localizer.cleaning.patched_ai_cleaner.hf_hub_download",
-        lambda repo, filename: seen.update(repo=repo, filename=filename) or "/cache/x",
+        "comic_localizer.cleaning.lama.hf_hub_download",
+        lambda repo, filename, revision=None: seen.update(
+            repo=repo, filename=filename, revision=revision
+        )
+        or "/cache/anime_manga_lama.pt",
     )
-    LamaCleaner.resolve_model_path("owner/name:weights.pt")
-    assert seen == {"repo": "owner/name", "filename": "weights.pt"}
+
+    def fake_load(path, map_location=None):
+        seen["path"] = path
+
+        class _M:
+            def eval(self_inner):
+                return sentinel
+
+        return _M()
+
+    monkeypatch.setattr(torch.jit, "load", fake_load)
+
+    cleaner = LamaCleaner(device=torch.device("cpu"))
+
+    assert cleaner.model is sentinel
+    assert seen["repo"] == "TareHimself/AnimeMangaInpainting-torchscript"
+    assert seen["filename"] == "anime_manga_lama.pt"
+    assert seen["revision"] == "v1"
+    assert seen["path"] == "/cache/anime_manga_lama.pt"
 
 
-def test_lama_cleaner_exposes_default_model_in_arguments():
-    default = {a.id: a.default for a in LamaCleaner.get_arguments()}["model_path"]
-    assert default == LamaCleaner.DEFAULT_MODEL_REPO
+def test_lama_takes_no_model_path_argument():
+    ids = {a.id for a in LamaCleaner.get_arguments()}
+    assert "model_path" not in ids
