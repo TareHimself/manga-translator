@@ -111,7 +111,20 @@ def test_deepfillv2_exposes_model_path_plus_the_base_arguments():
     assert {"inpaint_patches", "patch_padding", "device"} <= set(ids)
 
 
-def test_lama_downloads_its_model_from_the_hub(monkeypatch):
+def _fake_jit_load(seen: dict, sentinel):
+    def fake_load(path, map_location=None):
+        seen["path"] = path
+
+        class _M:
+            def eval(self_inner):
+                return sentinel
+
+        return _M()
+
+    return fake_load
+
+
+def test_lama_downloads_its_model_from_the_hub_by_default(monkeypatch):
     seen = {}
     sentinel = object()
 
@@ -122,17 +135,7 @@ def test_lama_downloads_its_model_from_the_hub(monkeypatch):
         )
         or "/cache/anime_manga_lama.pt",
     )
-
-    def fake_load(path, map_location=None):
-        seen["path"] = path
-
-        class _M:
-            def eval(self_inner):
-                return sentinel
-
-        return _M()
-
-    monkeypatch.setattr(torch.jit, "load", fake_load)
+    monkeypatch.setattr(torch.jit, "load", _fake_jit_load(seen, sentinel))
 
     cleaner = LamaCleaner(device=torch.device("cpu"))
 
@@ -143,6 +146,47 @@ def test_lama_downloads_its_model_from_the_hub(monkeypatch):
     assert seen["path"] == "/cache/anime_manga_lama.pt"
 
 
-def test_lama_takes_no_model_path_argument():
-    ids = {a.id for a in LamaCleaner.get_arguments()}
-    assert "model_path" not in ids
+def test_lama_respects_a_custom_repo_and_revision(monkeypatch):
+    seen = {}
+    sentinel = object()
+
+    monkeypatch.setattr(
+        "comic_localizer.cleaning.lama.hf_hub_download",
+        lambda repo, filename, revision=None: seen.update(
+            repo=repo, filename=filename, revision=revision
+        )
+        or "/cache/custom.pt",
+    )
+    monkeypatch.setattr(torch.jit, "load", _fake_jit_load(seen, sentinel))
+
+    LamaCleaner(
+        repo="me/fork",
+        filename="weights.pt",
+        revision="",
+        device=torch.device("cpu"),
+    )
+
+    assert (seen["repo"], seen["filename"]) == ("me/fork", "weights.pt")
+    assert seen["revision"] is None  # blank revision -> latest
+
+
+def test_lama_uses_a_local_model_path_when_given(monkeypatch):
+    seen = {}
+    sentinel = object()
+
+    def boom(*a, **k):
+        raise AssertionError("hf_hub_download should not be called when model_path is set")
+
+    monkeypatch.setattr("comic_localizer.cleaning.lama.hf_hub_download", boom)
+    monkeypatch.setattr(torch.jit, "load", _fake_jit_load(seen, sentinel))
+
+    cleaner = LamaCleaner(model_path="/models/lama.pt", device=torch.device("cpu"))
+
+    assert cleaner.model is sentinel
+    assert seen["path"] == "/models/lama.pt"
+
+
+def test_lama_exposes_model_path_and_hub_arguments():
+    ids = [a.id for a in LamaCleaner.get_arguments()]
+    assert ids[:4] == ["model_path", "repo", "filename", "revision"]
+    assert {"inpaint_patches", "patch_padding", "device"} <= set(ids)
